@@ -1,0 +1,6 @@
+{
+  "name": "@swiss/auth-api",
+  "scripts": {
+    "build": "go build -o dist/auth-api ."
+  }
+}

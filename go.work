@@ -1,0 +1,9 @@
+go 1.26.1
+
+use (
+	./services/auth-api
+	./services/internal/authn
+	./services/internal/database
+	./services/internal/jwtutil
+	./services/monolith-api
+)

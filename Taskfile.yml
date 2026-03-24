@@ -1,0 +1,102 @@
+version: "3"
+
+dotenv: [".env"]
+
+tasks:
+  db:up:
+    desc: "Starts only the PostgreSQL container (lightweight local DB)"
+    cmds:
+      - docker compose up -d postgres
+
+  db:wait:
+    desc: "Waits until Postgres accepts connections (requires db:up)"
+    deps: [db:up]
+    cmds:
+      - >-
+        until docker compose exec -T postgres pg_isready -U root -d utils_db;
+        do sleep 1; done
+      - sleep 2
+
+  db:down:
+    desc: "Stops and removes all Compose services (Postgres and APIs if running)"
+    cmds:
+      - docker compose down
+
+  stack:up:
+    desc: "Starts Postgres plus auth-api and monolith-api (full backend stack)"
+    cmds:
+      - docker compose up -d
+
+  stack:down:
+    desc: "Stops the full Compose stack"
+    cmds:
+      - docker compose down
+
+  db:clear:
+    desc: "Clears PostgreSQL data by removing the DB volume and restarting Postgres only"
+    cmds:
+      - docker compose down -v
+      - docker compose up -d postgres
+
+  db:generate:
+    desc: "Generates type-safe Go code from SQL schema and queries"
+    cmds:
+      - sqlc generate
+
+  migrate:up:
+    desc: "Applies all pending database migrations"
+    deps: [db:wait]
+    cmds:
+      - migrate -path schema/migrations -database "${DATABASE_URL}" -verbose up
+    requires:
+      vars: [DATABASE_URL]
+
+  migrate:down:
+    desc: "Reverts the most recent database migration"
+    cmds:
+      - migrate -path schema/migrations -database "${DATABASE_URL}" -verbose down 1
+    requires:
+      vars: [DATABASE_URL]
+
+  migrate:create:
+    desc: "Generates a new sequential migration file pair"
+    cmds:
+      - migrate create -ext sql -dir schema/migrations -seq {{.CLI_ARGS}}
+  api:dev:
+    desc: "Executes the Golang Authentication API (:8080); uses DATABASE_URL and JWT_SECRET from repo .env"
+    deps: [migrate:up]
+    dir: services/auth-api
+    cmds:
+      - go run .
+
+  monolith-api:dev:
+    desc: "Runs the Monolith E2EE API (:8081); uses DATABASE_URL and JWT_SECRET from repo .env"
+    deps: [migrate:up]
+    dir: services/monolith-api
+    cmds:
+      - go run .
+
+  turbo:dev:
+    desc: "Runs Next apps only (not Go services — those use api:dev / monolith-api:dev)"
+    deps: [migrate:up, types:sync]
+    cmds:
+      - pnpm turbo dev --parallel --filter monolith --filter auth-portal
+
+  web:dev:
+    desc: "Executes the Next.js monolith only"
+    dir: apps/monolith
+    cmds:
+      - pnpm run dev
+
+  types:sync:
+    desc: "Parses Go AST and generates Next.js TypeScript interfaces"
+    dir: services/monolith-api
+    cmds:
+      - tygo generate --config tygo.yaml
+
+  dev:
+    desc: "Full stack from repo .env — Postgres, migrations, auth-api :8080, monolith-api :8081, Turbo dev (all apps)"
+    deps:
+      - api:dev
+      - monolith-api:dev
+      - turbo:dev
