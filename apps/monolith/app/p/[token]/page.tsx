@@ -3,6 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Button, Input, Textarea } from "@swiss/ui";
 import { decryptSharedPasteContent, type PasswordKdfParams } from "@/app/lib/share-crypto";
+import { LuDownload } from "react-icons/lu";
+import { MdContentCopy } from "react-icons/md";
+import SyntaxInputArea from "@/components/SyntaxInputArea";
+import TextViewer from "@/components/TextViewer";
 
 type SharedPastePayload = {
   token: string;
@@ -34,6 +38,8 @@ export default function SharedPastePage({ params }: { params: Promise<{ token: s
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+
+  const [expirationProgress, setExpirationProgress] = useState(0.6);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,8 +110,50 @@ export default function SharedPastePage({ params }: { params: Promise<{ token: s
   const unlocked = title !== "" || content !== "";
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-24 pb-24 pt-12">
-      <h1 className="text-4xl font-bold">Shared Paste</h1>
-      <p className="text-sm text-(--on-surface-variant)">Token: {token}</p>
+      <div className="h-1 w-full rounded-full bg-(--surface-container-low)">
+        <div
+          className="h-full rounded-full bg-(--security-emerald) shadow-[0_0_20px_1px_var(--security-emerald)]"
+          style={{ width: `${Math.max(0, Math.min(1, expirationProgress)) * 100}%` }}
+        />
+      </div>
+      <div className="flex gap-4 mt-6">
+        <span className="text-sm text-(--on-surface-variant)">
+          encrypted placeholder
+        </span>
+        <span className="text-sm text-(--on-surface-variant)">
+          artifact id placeholder
+        </span>
+      </div>
+      <h1 className="text-7xl font-bold">{title}</h1>
+      <div className="flex gap-4 justify-between">
+        <div className="flex gap-8">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-light text-(--on-surface-variant) tracking-widest">ORIGIN</span>
+            <span className="text-white font-medium">123@gmail.com</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-light text-(--on-surface-variant) tracking-widest">CREATED</span>
+            <span className="text-white font-medium">123@gmail.com</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-light text-(--on-surface-variant) tracking-widest">EXPIRES</span>
+            <span className="text-(--security-emerald) font-medium">06:24:30 Remaining</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="tertiary" size="md" bold={true} disabled={!unlocked} className="gap-2 tracking-wider">
+            <MdContentCopy size={16}/>
+            {unlocked ? "COPY RAW" : "UNLOCK TO COPY"}
+          </Button>
+          <Button variant="tertiary" size="md" bold={true} disabled={!unlocked} className="gap-2 tracking-wider">
+            <LuDownload size={16} />
+            {unlocked ? "DOWNLOAD" : "UNLOCK TO COPY"}
+          </Button>
+        </div>
+      </div>
+      <div className="flex">
+
+      </div>
       {payload.visibility_mode === "password" && !unlocked ? (
         <div className="flex min-h-0 flex-1 items-center justify-center">
           <form onSubmit={(e) => void unlock(e)} className="flex w-full max-w-lg flex-col gap-3 rounded-md border border-white/10 bg-black/20 p-6">
@@ -124,9 +172,8 @@ export default function SharedPastePage({ params }: { params: Promise<{ token: s
           </form>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <Input title="Title" size="lg" value={title} readOnly />
-          <Textarea className="min-h-0 flex-1" value={content} readOnly />
+        <div className="flex min-h-0 flex-col gap-3 flex-1">
+          <TextViewer text={content} fileName={title} fileType="auto" className="flex-1" />
         </div>
       )}
     </div>

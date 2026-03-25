@@ -21,11 +21,13 @@ const buttonVariants = cva(
           "bg-white text-[#002112] shadow-[inset_0_0_0_999px_rgba(93,221,161,0.06)] hover:bg-(--security-emerald)",
         secondary:
           "bg-transparent text-(--on-surface) shadow-[inset_0_0_0_1px_rgba(71,71,71,0.2)] hover:bg-white/5",
+        tertiary:
+        "bg-(--surface-container-high) text-white hover:bg-(--surface-bright)",
         ghost: "bg-transparent text-(--on-surface) hover:bg-white/5",
         error:
           "bg-transparent text-[#ffb4ab] shadow-[inset_0_0_0_1px_rgba(255,180,171,0.35)] hover:bg-[#ffb4ab]/10",
         fancy:
-          "rounded-none bg-[#2f2f2f] text-[#5ddda1] border-l-4 border-t-0 border-r-0 border-b-0 border-[#5ddda1] hover:bg-[#393939] active:bg-[#404040] duration-300"
+          "rounded-none bg-[#2f2f2f] text-[#5ddda1] border-l-4 border-t-0 border-r-0 border-b-0 border-[#5ddda1] hover:bg-[#393939] active:bg-[#404040] duration-300",
       },
       size: {
         sm: "h-10 px-4 text-xs",

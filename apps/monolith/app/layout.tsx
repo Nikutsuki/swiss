@@ -31,7 +31,7 @@ export default function RootLayout({
     >
       <body className="min-h-full h-full flex flex-col text-gray-50 antialiased">
         <Header />
-        <main className="flex w-full flex-1 flex-col">
+        <main className="flex min-h-0 w-full flex-1 flex-col">
           <AppShell>{children}</AppShell>
         </main>
       </body>

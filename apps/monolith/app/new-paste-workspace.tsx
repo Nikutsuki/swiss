@@ -153,15 +153,15 @@ export default function NewPasteWorkspace() {
         const shareBody =
           encryptionOption === "public"
             ? {
-                visibility_mode: "public",
-                share_wrap_blob: rawDekB64,
-                ...(sec !== null ? { expires_in_seconds: Math.floor(sec) } : {}),
-              }
+              visibility_mode: "public",
+              share_wrap_blob: rawDekB64,
+              ...(sec !== null ? { expires_in_seconds: Math.floor(sec) } : {}),
+            }
             : {
-                visibility_mode: "password",
-                ...(await createPasswordWrappedDek(rawDekB64, sharePassword)),
-                ...(sec !== null ? { expires_in_seconds: Math.floor(sec) } : {}),
-              };
+              visibility_mode: "password",
+              ...(await createPasswordWrappedDek(rawDekB64, sharePassword)),
+              ...(sec !== null ? { expires_in_seconds: Math.floor(sec) } : {}),
+            };
         const shared = await fetchJson<{ url: string }>(`/api/pastes/${created.id}/share`, {
           method: "POST",
           body: JSON.stringify(shareBody),
@@ -324,10 +324,10 @@ export default function NewPasteWorkspace() {
               </Button>
             )}
           </div>
-          {status ? (
-            <p className="text-sm text-(--on-surface-variant)">{status}</p>
-          ) : null}
         </div>
+        {status ? (
+          <p className="text-sm text-(--on-surface-variant)">{status}</p>
+        ) : null}
       </div>
     </div>
   );

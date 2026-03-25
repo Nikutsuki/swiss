@@ -41,7 +41,7 @@ export function Modal({ isOpen, onClose, className, children }: ModalProps) {
         className
       )}
     >
-      <div className="p-6">
+      <div className="h-full p-6">
         {children}
       </div>
     </dialog>

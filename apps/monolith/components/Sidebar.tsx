@@ -10,6 +10,7 @@ import {
   MdNoteAdd,
   MdKeyboardDoubleArrowLeft,
   MdKeyboardDoubleArrowRight,
+  MdDescription,
 } from "react-icons/md";
 import { FaGlobeAmericas, FaFireAlt } from "react-icons/fa";
 
@@ -39,6 +40,9 @@ type RecentSharedPaste = {
   paste_id: string;
   public_token: string;
   visibility_mode: "public" | "password";
+  encrypted_title: string;
+  created_at: string;
+  expires_at?: string;
 };
 
 const SIDEBAR_EXPANDED_W = "clamp(14rem, 12.5vw, 20rem)";
@@ -69,36 +73,40 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
     };
   }, []);
 
+  const format_visibility = (mode: RecentSharedPaste["visibility_mode"]) =>
+    mode === "password" ? "Password" : "Public";
+  const format_timestamp = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const formatted = new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
+    }).format(date);
+    return `${formatted.replace(",", " //")} UTC`;
+  };
+
   return (
     <aside
       style={{ width: collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_EXPANDED_W }}
       className="flex h-full shrink-0 flex-col overflow-hidden border-r border-white/5 bg-(--surface-container-low) pt-5 transition-[width] duration-420 ease-[cubic-bezier(0.33,1,0.68,1)] motion-reduce:transition-none"
     >
       <div
-        className={`overflow-hidden px-2 transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${
-          collapsed
-            ? "pointer-events-none max-h-0 -translate-y-1 opacity-0"
-            : "max-h-40 translate-y-0 opacity-100"
-        }`}
+        className={`overflow-hidden px-4 pb-4 transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${collapsed
+          ? "pointer-events-none max-h-0 -translate-y-1 opacity-0"
+          : "max-h-40 translate-y-0 opacity-100"
+          }`}
         aria-hidden={collapsed}
       >
-        <h3 className="px-2 font-semibold tracking-wide">ARCHIVE</h3>
-        <h4 className="mt-2 mb-3 px-2 text-sm text-(--on-surface-variant)">
-          Recent Artifacts
-        </h4>
-        {recentShared.map((item) => (
-          <Link
-            key={item.paste_id}
-            href={`/p/${item.public_token}`}
-            className="mb-1 block truncate px-2 text-xs text-(--on-surface-variant) hover:text-(--on-surface)"
-          >
-            {item.visibility_mode === "password" ? "Protected" : "Public"} - {item.public_token.slice(0, 8)}
-          </Link>
-        ))}
+        <h3 className="px-2 font-semibold tracking-widest">ARTIFACT ARCHIVE</h3>
       </div>
 
       <nav
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pb-2"
+        className="flex min-h-0 flex-col overflow-y-auto overflow-x-hidden pb-2"
         aria-label="Archive sections"
       >
         {items.map(({ href, label, icon }) => {
@@ -113,20 +121,17 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               variant={active ? "fancy" : "ghost"}
               size="md"
               bold={active}
-              className={`${navLinkClass} ${
-                active ? "" : "text-(--on-surface) hover:bg-white/5"
-              } rounded-none ${
-                collapsed ? "justify-center px-2" : "justify-start gap-3"
-              }`}
+              className={`${navLinkClass} ${active ? "" : "text-(--on-surface) hover:bg-white/5"
+                } rounded-none ${collapsed ? "justify-center px-2" : "justify-start gap-3"
+                }`}
             >
               <Link href={href} title={collapsed ? label : undefined}>
                 {icon}
                 <span
-                  className={`min-w-0 truncate transition-[opacity,transform,max-width] duration-300 ease-out motion-reduce:transition-none ${
-                    collapsed
-                      ? "pointer-events-none max-w-0 -translate-x-1 opacity-0"
-                      : "max-w-48 translate-x-0 opacity-100"
-                  }`}
+                  className={`min-w-0 truncate transition-[opacity,transform,max-width] duration-300 ease-out motion-reduce:transition-none ${collapsed
+                    ? "pointer-events-none max-w-0 -translate-x-1 opacity-0"
+                    : "max-w-48 translate-x-0 opacity-100"
+                    }`}
                 >
                   {label}
                 </span>
@@ -135,6 +140,55 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
           );
         })}
       </nav>
+
+      <div
+        className={`px-4 pb-2 transition-[opacity,transform,max-height] duration-300 ease-out motion-reduce:transition-none ${collapsed
+          ? "pointer-events-none max-h-0 -translate-y-1 opacity-0"
+          : "max-h-96 translate-y-0 opacity-100"
+          }`}
+        aria-hidden={collapsed}
+      >
+        <h4 className="mx-2 mb-3 mt-2 text-xs tracking-widest text-(--on-surface-variant)">
+          RECENT ARTIFACTS
+        </h4>
+        <div className="space-y-1">
+          {recentShared.map((item) => {
+            const href = `/p/${item.public_token}`;
+            const selected = pathname === href;
+            return (
+              <Link
+                key={item.paste_id}
+                href={href}
+                className={`block border px-3 py-2 transition-colors ${selected
+                  ? "border-(--primary-fixed) bg-(--surface-container-high)"
+                  : "border-transparent bg-transparent hover:bg-(--surface-container-high)"
+                  }`}
+              >
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-(--security-emerald)">
+                    <MdDescription className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    {format_visibility(item.visibility_mode)}
+                  </span>
+                  <span className="truncate text-[10px] tracking-widest text-(--on-surface-variant)">
+                    ARTIFACT #{item.public_token.slice(0, 8)}
+                  </span>
+                </div>
+                <p className="truncate text-base font-black uppercase tracking-tight text-(--on-surface)">
+                  {item.encrypted_title || item.paste_id.slice(0, 18)}
+                </p>
+                <p className="mt-1 truncate text-[10px] uppercase tracking-[0.18em] text-(--on-surface-variant)">
+                  {format_timestamp(item.created_at)}
+                </p>
+              </Link>
+            );
+          })}
+          {recentShared.length === 0 ? (
+            <div className="border border-dashed border-(--outline-variant) px-3 py-4 text-[11px] uppercase tracking-widest text-(--on-surface-variant)">
+              No recent artifacts
+            </div>
+          ) : null}
+        </div>
+      </div>
 
       <div className="mt-auto shrink-0 border-t border-white/10 px-2 pb-4 pt-2">
         <Button

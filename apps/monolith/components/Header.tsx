@@ -16,7 +16,7 @@ export default function Header() {
         </div>
 
         <nav className="hidden justify-self-center md:flex items-center gap-8">
-          <Link href="/archive" className="text-(--on-surface-variant) transition-colors hover:text-white">
+          {/* <Link href="/archive" className="text-(--on-surface-variant) transition-colors hover:text-white">
             Archive
           </Link>
           <Link href="/api" className="text-(--on-surface-variant) transition-colors hover:text-white">
@@ -24,7 +24,7 @@ export default function Header() {
           </Link>
           <Link href="/docs" className="text-(--on-surface-variant) transition-colors hover:text-white">
             Docs
-          </Link>
+          </Link> */}
         </nav>
 
         <div className="flex items-center gap-6 justify-self-end">

@@ -56,14 +56,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const showSidebar = !pathname.startsWith("/p/") ? true : sharedRouteHasSession === true;
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-5rem)] w-full">
+    <div className="flex min-h-0 h-full w-full flex-1">
       {showSidebar ? (
         <Sidebar
           collapsed={collapsed}
           onToggleCollapsed={toggleCollapsed}
         />
       ) : null}
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }

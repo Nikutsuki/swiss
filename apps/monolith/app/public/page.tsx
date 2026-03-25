@@ -1,10 +1,5 @@
-import PlaceholderPage from "@/components/PlaceholderPage";
+import PublicWorkspace from "@/app/public/public-workspace";
 
 export default function PublicPage() {
-  return (
-    <PlaceholderPage
-      title="Public"
-      description="Public artifacts and sharing will appear here."
-    />
-  );
+  return <PublicWorkspace />;
 }

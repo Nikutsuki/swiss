@@ -19,6 +19,7 @@ import { isPasteExpiredClient } from "@/app/lib/paste-expiry";
 import type {
   PasteContentResponse,
   PasteMetadataResponse,
+  SharedPasteMetadataResponse,
 } from "@/src/types/backend";
 
 function truncateMiddle(s: string, max = 48): string {
@@ -67,9 +68,16 @@ export default function EncryptedMessagesWorkspace() {
       const url = rec
         ? `/api/pastes?${new URLSearchParams({ device_key_id: rec.deviceKeyId })}`
         : "/api/pastes";
-      const list = await fetchJson<PasteMetadataResponse[]>(url);
+      const [list, sharedRecent] = await Promise.all([
+        fetchJson<PasteMetadataResponse[]>(url),
+        fetchJson<SharedPasteMetadataResponse[]>("/api/pastes/shared/recent").catch(
+          () => [],
+        ),
+      ]);
+      const sharedPasteIds = new Set(sharedRecent.map((row) => row.paste_id));
+      const encryptedOnly = list.filter((meta) => !sharedPasteIds.has(meta.paste_id));
       const nextRows: ListRow[] = await Promise.all(
-        list.map(async (meta) => {
+        encryptedOnly.map(async (meta) => {
           if (rec && meta.wrapped_dek && !isPasteExpiredClient(meta)) {
             try {
               const decryptedTitle = await decryptTitleFromMetadata(
