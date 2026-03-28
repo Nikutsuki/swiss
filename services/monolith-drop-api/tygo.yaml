@@ -1,0 +1,6 @@
+packages:
+  - path: "github.com/Nikutsuki/swiss/services/monolith-drop-api/models"
+    output_path: "../../apps/monolith-drop/src/types/backend.d.ts"
+    type_mappings:
+      "time.Time": "string"
+      "uuid.UUID": "string"

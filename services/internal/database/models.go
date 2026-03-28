@@ -51,6 +51,18 @@ type MonolithDek struct {
 	IsPasswordBased pgtype.Bool        `json:"is_password_based"`
 }
 
+type MonolithDropSession struct {
+	ID          pgtype.UUID        `json:"id"`
+	HostUserID  pgtype.UUID        `json:"host_user_id"`
+	GuestUserID pgtype.UUID        `json:"guest_user_id"`
+	PeerHost    string             `json:"peer_host"`
+	PeerGuest   pgtype.Text        `json:"peer_guest"`
+	JoinSecret  string             `json:"join_secret"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	ClosedAt    pgtype.Timestamptz `json:"closed_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type MonolithPaste struct {
 	ID          pgtype.UUID        `json:"id"`
 	UserID      pgtype.UUID        `json:"user_id"`
@@ -60,6 +72,7 @@ type MonolithPaste struct {
 	BurnedAt    pgtype.Timestamptz `json:"burned_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	IsEncrypted pgtype.Bool        `json:"is_encrypted"`
+	VaultOnly   bool               `json:"vault_only"`
 }
 
 type MonolithPasteShare struct {

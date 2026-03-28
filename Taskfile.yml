@@ -76,11 +76,24 @@ tasks:
     cmds:
       - go run .
 
+  monolith-drop-api:dev:
+    desc: "Runs the Monolith Drop P2P session API (:8082); required for monolith-drop file sessions"
+    deps: [migrate:up]
+    dir: services/monolith-drop-api
+    cmds:
+      - go run .
+
+  signaling-api:dev:
+    desc: "Runs the WebRTC signaling WebSocket router (:8083); SIGNALING_ALLOWED_ORIGINS optional"
+    dir: services/signaling-api
+    cmds:
+      - go run .
+
   turbo:dev:
-    desc: "Runs Next apps only (not Go services — those use api:dev / monolith-api:dev)"
+    desc: "Runs Next apps only. Also run monolith-drop-api:dev (:8082) and signaling-api:dev (:8083) for Drop WebRTC."
     deps: [migrate:up, types:sync]
     cmds:
-      - pnpm turbo dev --parallel --filter monolith --filter auth-portal
+      - pnpm turbo dev --parallel --filter monolith --filter auth-portal --filter monolith-drop
 
   web:dev:
     desc: "Executes the Next.js monolith only"
@@ -89,14 +102,18 @@ tasks:
       - pnpm run dev
 
   types:sync:
-    desc: "Parses Go AST and generates Next.js TypeScript interfaces"
-    dir: services/monolith-api
+    desc: "Parses Go AST and emits TypeScript for each app / package (see per-service tygo.yaml)"
     cmds:
-      - tygo generate --config tygo.yaml
+      - cd services/monolith-api && tygo generate --config tygo.yaml
+      - cd services/auth-api && tygo generate --config tygo.yaml
+      - cd services/monolith-drop-api && tygo generate --config tygo.yaml
+      - cd services/signaling-api && tygo generate --config tygo.yaml
 
   dev:
     desc: "Full stack from repo .env — Postgres, migrations, auth-api :8080, monolith-api :8081, Turbo dev (all apps)"
     deps:
       - api:dev
       - monolith-api:dev
+      - monolith-drop-api:dev
+      - signaling-api:dev
       - turbo:dev

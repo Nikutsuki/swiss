@@ -160,10 +160,10 @@ export default function TextViewer({
   const headerTitle = title ?? fileName ?? "artifact.txt";
 
   return (
-    <div className={`relative group flex min-h-0 min-w-0 flex-col ${className}`}>
+    <div className={`relative group flex min-h-0 min-w-0 flex-col mt-6 ${className}`}>
       {showChrome ? (
         <div className="pointer-events-none absolute -top-3 right-6 z-10">
-          <span className="rounded-lg border border-(--outline-variant)/20 bg-(--surface-container-highest) px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-(--on-surface)">
+          <span className="rounded-lg border border-(--outline-variant)/20 bg-(--surface-container-high) px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-(--on-surface)">
             {badge}
           </span>
         </div>

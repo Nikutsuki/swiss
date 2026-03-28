@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  allowedDevOrigins: ['auth.swiss.local', 'monolith.swiss.local'],
+  allowedDevOrigins: ['auth.swiss.local', 'monolith.swiss.local', 'localhost', '0.0.0.0'],
 };
 
 export default nextConfig;

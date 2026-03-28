@@ -256,54 +256,37 @@ export default function VaultWorkspace() {
     }
   }, [coverage, device, loadCoverage]);
 
-  const viewSharedPaste = useCallback(async (pasteId: string) => {
-    setViewPasteId(pasteId);
-    setStatus("");
-    try {
-      const recent = await fetchJson<
-        { paste_id: string; public_token: string }[]
-      >("/api/pastes/shared/recent");
-      const existing = recent.find((row) => row.paste_id === pasteId);
-      if (existing?.public_token) {
-        window.open(`/p/${existing.public_token}`, "_blank", "noopener,noreferrer");
-        return;
-      }
+  const viewSharedPaste = useCallback(
+    async (pasteId: string) => {
+      setViewPasteId(pasteId);
+      setStatus("");
+      try {
+        const pasteRow = coverage?.pastes.find((p) => p.paste_id === pasteId);
+        const isVaultOnly = pasteRow?.vault_only ?? true;
 
-      if (!device) {
-        throw new Error("No existing share link found, and this device cannot create one.");
-      }
+        const recent = await fetchJson<
+          { paste_id: string; public_token: string }[]
+        >("/api/pastes/shared/recent");
+        const existing = recent.find((row) => row.paste_id === pasteId);
 
-      const q = new URLSearchParams({ device_key_id: device.deviceKeyId });
-      const data = await fetchJson<PasteContentResponse>(
-        `/api/pastes/${pasteId}?${q.toString()}`,
-      );
-      if (!data.wrapped_dek) {
-        throw new Error(
-          "This device cannot unwrap this paste yet. Rewrap from a device that already has access.",
-        );
+        if (!isVaultOnly && existing?.public_token) {
+          window.open(
+            `/p/${existing.public_token}`,
+            "_blank",
+            "noopener,noreferrer",
+          );
+          return;
+        }
+
+        window.location.assign(`/encrypted/${encodeURIComponent(pasteId)}`);
+      } catch (e) {
+        setStatus(e instanceof Error ? e.message : "Failed to open paste");
+      } finally {
+        setViewPasteId(null);
       }
-      const dek = await unwrapDek(
-        base64UrlToBytes(data.wrapped_dek),
-        device.keyPair.privateKey,
-      );
-      const rawDek = new Uint8Array(await crypto.subtle.exportKey("raw", dek));
-      const shared = await fetchJson<{ token: string; url: string }>(
-        `/api/pastes/${pasteId}/share`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            visibility_mode: "public",
-            share_wrap_blob: bytesToBase64Url(rawDek),
-          }),
-        },
-      );
-      window.open(shared.url, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      setStatus(e instanceof Error ? e.message : "Failed to open paste");
-    } finally {
-      setViewPasteId(null);
-    }
-  }, [device]);
+    },
+    [coverage],
+  );
 
   if (!idbReady) {
     return (
@@ -415,6 +398,9 @@ export default function VaultWorkspace() {
                     Expires
                   </th>
                   <th className="px-2 py-3 font-semibold text-(--on-surface-variant)">
+                    Encryption
+                  </th>
+                  <th className="px-2 py-3 font-semibold text-(--on-surface-variant)">
                     Visibility
                   </th>
                   {coverage.devices.map((d) => {
@@ -462,6 +448,9 @@ export default function VaultWorkspace() {
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 text-(--on-surface-variant)">
                         {paste.expires_at ?? "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-2 text-(--on-surface-variant)">
+                        {paste.is_encrypted ? "Encrypted Artifact" : "Plaintext"}
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 text-(--on-surface-variant)">
                         {sharedByPasteId[paste.paste_id]?.visibility_mode ===

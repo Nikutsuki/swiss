@@ -1,6 +1,6 @@
 -- name: InsertEncryptedPayload :one
-INSERT INTO monolith_paste (user_id, title, content, expires_at, is_encrypted)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO monolith_paste (user_id, title, content, expires_at, is_encrypted, vault_only)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id;
 
 -- name: WipeExpiredPastePayloadsForUser :exec
@@ -26,6 +26,7 @@ SELECT
     p.created_at,
     p.expires_at,
     p.is_encrypted,
+    p.vault_only,
     d.wrapped_dek,
     d.is_password_based
 FROM monolith_paste p
@@ -45,6 +46,7 @@ SELECT
     p.content AS encrypted_content, 
     p.expires_at,
     p.is_encrypted,
+    p.vault_only,
     d.wrapped_dek,
     d.is_password_based
 FROM monolith_paste p
@@ -62,6 +64,7 @@ SELECT
   p.created_at,
   p.expires_at,
   p.is_encrypted,
+  p.vault_only,
   false AS payload_wiped,
   COALESCE(string_agg(d.device_key_id::text, ',' ORDER BY d.device_key_id), '')::text AS device_key_ids_csv
 FROM monolith_paste p
@@ -78,6 +81,7 @@ SELECT
   p.expires_at,
   p.burned_at,
   p.is_encrypted,
+  p.vault_only,
   COALESCE(string_agg(d.device_key_id::text, ',' ORDER BY d.device_key_id), '')::text AS device_key_ids_csv
 FROM monolith_paste p
 LEFT JOIN monolith_dek d ON d.paste_id = p.id
@@ -105,6 +109,11 @@ WHERE id = $1 AND user_id = $2;
 SELECT EXISTS(
   SELECT 1 FROM monolith_paste WHERE id = $1 AND user_id = $2
 ) AS ok;
+
+-- name: FetchPasteVaultOnlyForOwner :one
+SELECT vault_only
+FROM monolith_paste
+WHERE id = $1 AND user_id = $2;
 
 -- name: UpsertWrappedDEK :exec
 INSERT INTO monolith_dek (paste_id, device_key_id, wrapped_dek)
@@ -177,7 +186,11 @@ SELECT
   p.title AS encrypted_title,
   p.content AS encrypted_content,
   p.expires_at AS paste_expires_at,
+  p.created_at AS paste_created_at,
+  p.is_encrypted,
+  p.vault_only,
   p.burned_at,
+  u.email AS owner_email,
   s.public_token,
   s.visibility_mode,
   s.share_wrap_nonce,
@@ -191,6 +204,7 @@ SELECT
   s.revoked_at
 FROM monolith_paste_share s
 JOIN monolith_paste p ON p.id = s.paste_id
+JOIN auth_users u ON u.id = p.user_id
 WHERE s.public_token = $1;
 
 -- name: ListRecentSharedPastesByOwner :many

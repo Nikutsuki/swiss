@@ -1,12 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Button, Input, Textarea } from "@swiss/ui";
+import { Button, Input } from "@swiss/ui";
+import { ArtifactHeroLayout } from "@/components/artifact-hero-layout";
+import TextViewer from "@/components/TextViewer";
+import {
+  copyTextToClipboard,
+  downloadTextAsFile,
+  sanitizeDownloadBasename,
+} from "@/app/lib/artifact-export";
 import { decryptSharedPasteContent, type PasswordKdfParams } from "@/app/lib/share-crypto";
+import { useArtifactExpiry } from "@/app/lib/use-artifact-expiry";
 import { LuDownload } from "react-icons/lu";
 import { MdContentCopy } from "react-icons/md";
-import SyntaxInputArea from "@/components/SyntaxInputArea";
-import TextViewer from "@/components/TextViewer";
 
 type SharedPastePayload = {
   token: string;
@@ -17,6 +23,10 @@ type SharedPastePayload = {
   share_wrap_blob: string;
   password_kdf?: PasswordKdfParams;
   expires_at?: string;
+  created_at: string;
+  owner_email: string;
+  paste_id: string;
+  is_encrypted: boolean;
 };
 
 async function fetchSharedPaste(token: string): Promise<SharedPastePayload> {
@@ -31,7 +41,6 @@ async function fetchSharedPaste(token: string): Promise<SharedPastePayload> {
 }
 
 export default function SharedPastePage({ params }: { params: Promise<{ token: string }> }) {
-  const [token, setToken] = useState("");
   const [payload, setPayload] = useState<SharedPastePayload | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -39,7 +48,10 @@ export default function SharedPastePage({ params }: { params: Promise<{ token: s
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
 
-  const [expirationProgress, setExpirationProgress] = useState(0.6);
+  const { expirationProgress, remainingTime } = useArtifactExpiry(
+    payload?.created_at,
+    payload?.expires_at ?? null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +59,6 @@ export default function SharedPastePage({ params }: { params: Promise<{ token: s
       try {
         const { token: t } = await params;
         if (cancelled) return;
-        setToken(t);
         const data = await fetchSharedPaste(t);
         if (cancelled) return;
         setPayload(data);
@@ -97,6 +108,22 @@ export default function SharedPastePage({ params }: { params: Promise<{ token: s
     }
   };
 
+  const unlocked = title !== "" || content !== "";
+  /** Copy/download export body only (not the title line). */
+  const exportBody = content;
+
+  const handleCopy = () => {
+    void copyTextToClipboard(exportBody);
+  };
+
+  const handleDownload = () => {
+    const base = sanitizeDownloadBasename(
+      title || "artifact",
+      payload?.paste_id.slice(0, 8) ?? "paste",
+    );
+    downloadTextAsFile(base, exportBody);
+  };
+
   if (busy && !payload) {
     return <div className="flex flex-1 items-center justify-center p-8">Loading paste...</div>;
   }
@@ -107,56 +134,62 @@ export default function SharedPastePage({ params }: { params: Promise<{ token: s
     return <div className="flex flex-1 items-center justify-center p-8">Paste unavailable.</div>;
   }
 
-  const unlocked = title !== "" || content !== "";
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-24 pb-24 pt-12">
-      <div className="h-1 w-full rounded-full bg-(--surface-container-low)">
-        <div
-          className="h-full rounded-full bg-(--security-emerald) shadow-[0_0_20px_1px_var(--security-emerald)]"
-          style={{ width: `${Math.max(0, Math.min(1, expirationProgress)) * 100}%` }}
-        />
-      </div>
-      <div className="flex gap-4 mt-6">
-        <span className="text-sm text-(--on-surface-variant)">
-          encrypted placeholder
-        </span>
-        <span className="text-sm text-(--on-surface-variant)">
-          artifact id placeholder
-        </span>
-      </div>
-      <h1 className="text-7xl font-bold">{title}</h1>
-      <div className="flex gap-4 justify-between">
-        <div className="flex gap-8">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-light text-(--on-surface-variant) tracking-widest">ORIGIN</span>
-            <span className="text-white font-medium">123@gmail.com</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-light text-(--on-surface-variant) tracking-widest">CREATED</span>
-            <span className="text-white font-medium">123@gmail.com</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-light text-(--on-surface-variant) tracking-widest">EXPIRES</span>
-            <span className="text-(--security-emerald) font-medium">06:24:30 Remaining</span>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="tertiary" size="md" bold={true} disabled={!unlocked} className="gap-2 tracking-wider">
-            <MdContentCopy size={16}/>
-            {unlocked ? "COPY RAW" : "UNLOCK TO COPY"}
+    <ArtifactHeroLayout
+      expirationProgress={expirationProgress}
+      artifactKindBadge={
+        payload.is_encrypted ? "ENCRYPTED ARTIFACT" : "PLAINTEXT ARTIFACT"
+      }
+      isEncrypted={payload.is_encrypted}
+      pasteIdFragment={payload.paste_id.split("-")[0]}
+      headline={unlocked ? title : "Encrypted Paste"}
+      originLabel="ORIGIN"
+      originValue={payload.owner_email}
+      createdDisplay={new Date(payload.created_at).toLocaleDateString()}
+      expiresDisplay={remainingTime}
+      actions={
+        <>
+          <Button
+            type="button"
+            variant="tertiary"
+            size="md"
+            bold={true}
+            disabled={!unlocked || content === ""}
+            className="gap-2 tracking-wider"
+            onClick={() => handleCopy()}
+          >
+            <MdContentCopy size={16} />
+            {!unlocked
+              ? "UNLOCK TO COPY"
+              : content === ""
+                ? "NO BODY TO COPY"
+                : "COPY RAW"}
           </Button>
-          <Button variant="tertiary" size="md" bold={true} disabled={!unlocked} className="gap-2 tracking-wider">
+          <Button
+            type="button"
+            variant="tertiary"
+            size="md"
+            bold={true}
+            disabled={!unlocked || content === ""}
+            className="gap-2 tracking-wider"
+            onClick={() => handleDownload()}
+          >
             <LuDownload size={16} />
-            {unlocked ? "DOWNLOAD" : "UNLOCK TO COPY"}
+            {!unlocked
+              ? "UNLOCK TO DOWNLOAD"
+              : content === ""
+                ? "NO BODY"
+                : "DOWNLOAD"}
           </Button>
-        </div>
-      </div>
-      <div className="flex">
-
-      </div>
+        </>
+      }
+    >
       {payload.visibility_mode === "password" && !unlocked ? (
         <div className="flex min-h-0 flex-1 items-center justify-center">
-          <form onSubmit={(e) => void unlock(e)} className="flex w-full max-w-lg flex-col gap-3 rounded-md border border-white/10 bg-black/20 p-6">
+          <form
+            onSubmit={(e) => void unlock(e)}
+            className="flex w-full max-w-lg flex-col gap-3 rounded-md border border-white/10 bg-black/20 p-6"
+          >
             <Input
               title="Password"
               type="password"
@@ -176,6 +209,6 @@ export default function SharedPastePage({ params }: { params: Promise<{ token: s
           <TextViewer text={content} fileName={title} fileType="auto" className="flex-1" />
         </div>
       )}
-    </div>
+    </ArtifactHeroLayout>
   );
 }

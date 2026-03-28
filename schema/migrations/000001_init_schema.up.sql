@@ -32,7 +32,8 @@ CREATE TABLE monolith_paste (
     expires_at TIMESTAMPTZ NULL,
     burned_at TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    is_encrypted BOOLEAN DEFAULT TRUE
+    is_encrypted BOOLEAN DEFAULT TRUE,
+    vault_only BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE monolith_dek (

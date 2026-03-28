@@ -4,11 +4,19 @@
     "NEXT_PUBLIC_AUTH_URL",
     "NEXT_PUBLIC_ROOT_DOMAIN",
     "NEXT_PUBLIC_MONOLITH_URL",
+    "NEXT_PUBLIC_MONOLITH_DROP_URL",
     "PORT",
     "COOKIE_SECURE",
     "JWT_SECRET",
     "AUTH_API_ORIGIN",
-    "MONOLITH_API_ORIGIN"
+    "AUTH_HTTP_ADDR",
+    "MONOLITH_API_ORIGIN",
+    "MONOLITH_HTTP_ADDR",
+    "MONOLITH_DROP_API_ORIGIN",
+    "MONOLITH_DROP_HTTP_ADDR",
+    "NEXT_PUBLIC_SIGNALING_WS_URL",
+    "SIGNALING_HTTP_ADDR",
+    "SIGNALING_ALLOWED_ORIGINS"
   ],
   "tasks": {
     "build": {
@@ -28,6 +36,12 @@
       "dependsOn": [
         "^lint"
       ]
+    },
+    "test": {
+      "dependsOn": [
+        "^test"
+      ],
+      "cache": true
     }
   }
 }

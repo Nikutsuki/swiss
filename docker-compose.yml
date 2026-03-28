@@ -25,6 +25,7 @@ services:
     environment:
       DATABASE_URL: postgresql://root:secretpassword@postgres:5432/utils_db?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:-dev-insecure-change-me}
+      AUTH_HTTP_ADDR: ${AUTH_HTTP_ADDR:-:8080}
     command: go run ./services/auth-api
     depends_on:
       postgres:
@@ -40,7 +41,37 @@ services:
     environment:
       DATABASE_URL: postgresql://root:secretpassword@postgres:5432/utils_db?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:-dev-insecure-change-me}
+      MONOLITH_HTTP_ADDR: ${MONOLITH_HTTP_ADDR:-:8081}
     command: go run ./services/monolith-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  signaling-api:
+    image: golang:1.26-bookworm
+    working_dir: /src
+    volumes:
+      - .:/src
+    ports:
+      - "8083:8083"
+    environment:
+      SIGNALING_HTTP_ADDR: ":8083"
+      SIGNALING_ALLOWED_ORIGINS: ${SIGNALING_ALLOWED_ORIGINS:-}
+    command: go run ./services/signaling-api
+
+  monolith-drop-api:
+    image: golang:1.26-bookworm
+    working_dir: /src
+    volumes:
+      - .:/src
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: postgresql://root:secretpassword@postgres:5432/utils_db?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-insecure-change-me}
+      MONOLITH_DROP_HTTP_ADDR: ${MONOLITH_DROP_HTTP_ADDR:-:8082}
+      MONOLITH_DROP_CORS_ORIGINS: ${MONOLITH_DROP_CORS_ORIGINS:-}
+    command: go run ./services/monolith-drop-api
     depends_on:
       postgres:
         condition: service_healthy

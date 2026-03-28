@@ -41,6 +41,7 @@ SELECT
     p.content AS encrypted_content, 
     p.expires_at,
     p.is_encrypted,
+    p.vault_only,
     d.wrapped_dek,
     d.is_password_based
 FROM monolith_paste p
@@ -65,6 +66,7 @@ type FetchPasteContentByPasteIDRow struct {
 	EncryptedContent []byte             `json:"encrypted_content"`
 	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
 	IsEncrypted      pgtype.Bool        `json:"is_encrypted"`
+	VaultOnly        bool               `json:"vault_only"`
 	WrappedDek       []byte             `json:"wrapped_dek"`
 	IsPasswordBased  pgtype.Bool        `json:"is_password_based"`
 }
@@ -78,6 +80,7 @@ func (q *Queries) FetchPasteContentByPasteID(ctx context.Context, arg FetchPaste
 		&i.EncryptedContent,
 		&i.ExpiresAt,
 		&i.IsEncrypted,
+		&i.VaultOnly,
 		&i.WrappedDek,
 		&i.IsPasswordBased,
 	)
@@ -90,6 +93,7 @@ SELECT
   p.created_at,
   p.expires_at,
   p.is_encrypted,
+  p.vault_only,
   false AS payload_wiped,
   COALESCE(string_agg(d.device_key_id::text, ',' ORDER BY d.device_key_id), '')::text AS device_key_ids_csv
 FROM monolith_paste p
@@ -105,6 +109,7 @@ type FetchPasteDekCoverageActiveForUserRow struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 	IsEncrypted     pgtype.Bool        `json:"is_encrypted"`
+	VaultOnly       bool               `json:"vault_only"`
 	PayloadWiped    bool               `json:"payload_wiped"`
 	DeviceKeyIdsCsv string             `json:"device_key_ids_csv"`
 }
@@ -123,6 +128,7 @@ func (q *Queries) FetchPasteDekCoverageActiveForUser(ctx context.Context, userID
 			&i.CreatedAt,
 			&i.ExpiresAt,
 			&i.IsEncrypted,
+			&i.VaultOnly,
 			&i.PayloadWiped,
 			&i.DeviceKeyIdsCsv,
 		); err != nil {
@@ -143,6 +149,7 @@ SELECT
   p.expires_at,
   p.burned_at,
   p.is_encrypted,
+  p.vault_only,
   COALESCE(string_agg(d.device_key_id::text, ',' ORDER BY d.device_key_id), '')::text AS device_key_ids_csv
 FROM monolith_paste p
 LEFT JOIN monolith_dek d ON d.paste_id = p.id
@@ -159,6 +166,7 @@ type FetchPasteDekCoverageBurnedForUserRow struct {
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 	BurnedAt        pgtype.Timestamptz `json:"burned_at"`
 	IsEncrypted     pgtype.Bool        `json:"is_encrypted"`
+	VaultOnly       bool               `json:"vault_only"`
 	DeviceKeyIdsCsv string             `json:"device_key_ids_csv"`
 }
 
@@ -177,6 +185,7 @@ func (q *Queries) FetchPasteDekCoverageBurnedForUser(ctx context.Context, userID
 			&i.ExpiresAt,
 			&i.BurnedAt,
 			&i.IsEncrypted,
+			&i.VaultOnly,
 			&i.DeviceKeyIdsCsv,
 		); err != nil {
 			return nil, err
@@ -196,6 +205,7 @@ SELECT
     p.created_at,
     p.expires_at,
     p.is_encrypted,
+    p.vault_only,
     d.wrapped_dek,
     d.is_password_based
 FROM monolith_paste p
@@ -220,6 +230,7 @@ type FetchPasteMetadataByDeviceIDRow struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 	IsEncrypted     pgtype.Bool        `json:"is_encrypted"`
+	VaultOnly       bool               `json:"vault_only"`
 	WrappedDek      []byte             `json:"wrapped_dek"`
 	IsPasswordBased pgtype.Bool        `json:"is_password_based"`
 }
@@ -239,6 +250,7 @@ func (q *Queries) FetchPasteMetadataByDeviceID(ctx context.Context, arg FetchPas
 			&i.CreatedAt,
 			&i.ExpiresAt,
 			&i.IsEncrypted,
+			&i.VaultOnly,
 			&i.WrappedDek,
 			&i.IsPasswordBased,
 		); err != nil {
@@ -252,13 +264,35 @@ func (q *Queries) FetchPasteMetadataByDeviceID(ctx context.Context, arg FetchPas
 	return items, nil
 }
 
+const fetchPasteVaultOnlyForOwner = `-- name: FetchPasteVaultOnlyForOwner :one
+SELECT vault_only
+FROM monolith_paste
+WHERE id = $1 AND user_id = $2
+`
+
+type FetchPasteVaultOnlyForOwnerParams struct {
+	ID     pgtype.UUID `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) FetchPasteVaultOnlyForOwner(ctx context.Context, arg FetchPasteVaultOnlyForOwnerParams) (bool, error) {
+	row := q.db.QueryRow(ctx, fetchPasteVaultOnlyForOwner, arg.ID, arg.UserID)
+	var vault_only bool
+	err := row.Scan(&vault_only)
+	return vault_only, err
+}
+
 const getPasteShareByToken = `-- name: GetPasteShareByToken :one
 SELECT
   p.id AS paste_id,
   p.title AS encrypted_title,
   p.content AS encrypted_content,
   p.expires_at AS paste_expires_at,
+  p.created_at AS paste_created_at,
+  p.is_encrypted,
+  p.vault_only,
   p.burned_at,
+  u.email AS owner_email,
   s.public_token,
   s.visibility_mode,
   s.share_wrap_nonce,
@@ -272,6 +306,7 @@ SELECT
   s.revoked_at
 FROM monolith_paste_share s
 JOIN monolith_paste p ON p.id = s.paste_id
+JOIN auth_users u ON u.id = p.user_id
 WHERE s.public_token = $1
 `
 
@@ -280,7 +315,11 @@ type GetPasteShareByTokenRow struct {
 	EncryptedTitle      []byte             `json:"encrypted_title"`
 	EncryptedContent    []byte             `json:"encrypted_content"`
 	PasteExpiresAt      pgtype.Timestamptz `json:"paste_expires_at"`
+	PasteCreatedAt      pgtype.Timestamptz `json:"paste_created_at"`
+	IsEncrypted         pgtype.Bool        `json:"is_encrypted"`
+	VaultOnly           bool               `json:"vault_only"`
 	BurnedAt            pgtype.Timestamptz `json:"burned_at"`
+	OwnerEmail          string             `json:"owner_email"`
 	PublicToken         string             `json:"public_token"`
 	VisibilityMode      string             `json:"visibility_mode"`
 	ShareWrapNonce      []byte             `json:"share_wrap_nonce"`
@@ -302,7 +341,11 @@ func (q *Queries) GetPasteShareByToken(ctx context.Context, publicToken string) 
 		&i.EncryptedTitle,
 		&i.EncryptedContent,
 		&i.PasteExpiresAt,
+		&i.PasteCreatedAt,
+		&i.IsEncrypted,
+		&i.VaultOnly,
 		&i.BurnedAt,
+		&i.OwnerEmail,
 		&i.PublicToken,
 		&i.VisibilityMode,
 		&i.ShareWrapNonce,
@@ -319,8 +362,8 @@ func (q *Queries) GetPasteShareByToken(ctx context.Context, publicToken string) 
 }
 
 const insertEncryptedPayload = `-- name: InsertEncryptedPayload :one
-INSERT INTO monolith_paste (user_id, title, content, expires_at, is_encrypted)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO monolith_paste (user_id, title, content, expires_at, is_encrypted, vault_only)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id
 `
 
@@ -330,6 +373,7 @@ type InsertEncryptedPayloadParams struct {
 	Content     []byte             `json:"content"`
 	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
 	IsEncrypted pgtype.Bool        `json:"is_encrypted"`
+	VaultOnly   bool               `json:"vault_only"`
 }
 
 func (q *Queries) InsertEncryptedPayload(ctx context.Context, arg InsertEncryptedPayloadParams) (pgtype.UUID, error) {
@@ -339,6 +383,7 @@ func (q *Queries) InsertEncryptedPayload(ctx context.Context, arg InsertEncrypte
 		arg.Content,
 		arg.ExpiresAt,
 		arg.IsEncrypted,
+		arg.VaultOnly,
 	)
 	var id pgtype.UUID
 	err := row.Scan(&id)

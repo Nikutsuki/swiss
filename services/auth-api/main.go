@@ -21,12 +21,12 @@ func main() {
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgresql://root:secretpassword@localhost:5432/utils_db?sslmode=disable"
+		panic("DATABASE_URL environment variable is required")
 	}
 
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+		panic("Failed to connect to database: " + err.Error())
 	}
 	defer pool.Close()
 
@@ -55,6 +55,10 @@ func main() {
 	mux.HandleFunc("POST /totp/generate", authHandlers.TOTPGenerate)
 	mux.HandleFunc("POST /totp/verify", authHandlers.TOTPVerify)
 
-	log.Println("auth-api running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	addr := os.Getenv("AUTH_HTTP_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	log.Printf("auth-api listening on %s", addr)
+	log.Fatal(http.ListenAndServe(addr, mux))
 }

@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useRef, type ReactNode, type MouseEvent } from "react";
 import { cn } from "./utils"; // Assumes existing utility
 

@@ -27,6 +27,8 @@ type createPasteReq struct {
 	EncryptedContent string         `json:"encrypted_content"`
 	WrappedDEKs      []wrappedDEKIn `json:"wrapped_deks"`
 	ExpiresInSeconds *int           `json:"expires_in_seconds,omitempty"`
+	IsEncrypted      bool           `json:"is_encrypted"`
+	VaultOnly        *bool          `json:"vault_only,omitempty"`
 }
 
 type createPasteResp struct {
@@ -38,6 +40,8 @@ type pasteContentResp struct {
 	EncryptedTitle   string `json:"encrypted_title"`
 	EncryptedContent string `json:"encrypted_content"`
 	WrappedDek       string `json:"wrapped_dek"`
+	IsEncrypted      bool   `json:"is_encrypted"`
+	VaultOnly        bool   `json:"vault_only"`
 }
 
 type pasteMetaResp struct {
@@ -47,6 +51,8 @@ type pasteMetaResp struct {
 	WrappedDek     string  `json:"wrapped_dek"`
 	ExpiresAt      *string `json:"expires_at,omitempty"`
 	PayloadWiped   bool    `json:"payload_wiped"`
+	IsEncrypted    bool    `json:"is_encrypted"`
+	VaultOnly      bool    `json:"vault_only"`
 }
 
 type pasteShareKdfIn struct {
@@ -79,6 +85,10 @@ type sharedPasteResp struct {
 	ShareWrapBlob    string           `json:"share_wrap_blob,omitempty"`
 	PasswordKdf      *pasteShareKdfIn `json:"password_kdf,omitempty"`
 	ExpiresAt        *string          `json:"expires_at,omitempty"`
+	CreatedAt        string           `json:"created_at"`
+	OwnerEmail       string           `json:"owner_email"`
+	PasteID          string           `json:"paste_id"`
+	IsEncrypted      bool             `json:"is_encrypted"`
 }
 
 type recentSharedPasteResp struct {
@@ -142,6 +152,10 @@ func (h *Handler) CreatePaste(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	vaultOnly := true
+	if body.VaultOnly != nil {
+		vaultOnly = *body.VaultOnly
+	}
 	title, err := decodeBase64(body.EncryptedTitle)
 	if err != nil {
 		http.Error(w, "invalid encrypted_title", http.StatusBadRequest)
@@ -194,10 +208,12 @@ func (h *Handler) CreatePaste(w http.ResponseWriter, r *http.Request) {
 
 	qtx := database.New(tx)
 	pasteID, err := qtx.InsertEncryptedPayload(ctx, database.InsertEncryptedPayloadParams{
-		UserID:    pgUUIDFromGoogle(userID),
-		Title:     title,
-		Content:   content,
-		ExpiresAt: expiresAt,
+		UserID:      pgUUIDFromGoogle(userID),
+		Title:       title,
+		Content:     content,
+		ExpiresAt:   expiresAt,
+		IsEncrypted: pgtype.Bool{Bool: body.IsEncrypted, Valid: true},
+		VaultOnly:   vaultOnly,
 	})
 	if err != nil {
 		http.Error(w, "Failed to save paste", http.StatusInternalServerError)
@@ -250,7 +266,8 @@ func (h *Handler) UpsertPasteShare(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "visibility_mode must be public or password", http.StatusBadRequest)
 		return
 	}
-	owned, err := h.db.PasteOwnedByUser(r.Context(), database.PasteOwnedByUserParams{ID: pid, UserID: uid})
+	ctx := r.Context()
+	owned, err := h.db.PasteOwnedByUser(ctx, database.PasteOwnedByUserParams{ID: pid, UserID: uid})
 	if err != nil {
 		http.Error(w, "Failed to verify paste", http.StatusInternalServerError)
 		return
@@ -259,7 +276,23 @@ func (h *Handler) UpsertPasteShare(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
-	hasCipher, err := h.db.PasteHasCiphertext(r.Context(), database.PasteHasCiphertextParams{ID: pid, UserID: uid})
+	vaultOnly, err := h.db.FetchPasteVaultOnlyForOwner(ctx, database.FetchPasteVaultOnlyForOwnerParams{
+		ID:     pid,
+		UserID: uid,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to verify paste", http.StatusInternalServerError)
+		return
+	}
+	if vaultOnly {
+		http.Error(w, "vault-only pastes cannot be shared via link", http.StatusForbidden)
+		return
+	}
+	hasCipher, err := h.db.PasteHasCiphertext(ctx, database.PasteHasCiphertextParams{ID: pid, UserID: uid})
 	if err != nil {
 		http.Error(w, "Failed to verify paste", http.StatusInternalServerError)
 		return
@@ -322,7 +355,7 @@ func (h *Handler) UpsertPasteShare(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to generate share token", http.StatusInternalServerError)
 		return
 	}
-	if err := h.db.UpsertPasteShare(r.Context(), database.UpsertPasteShareParams{
+	if err := h.db.UpsertPasteShare(ctx, database.UpsertPasteShareParams{
 		PasteID:             pid,
 		PublicToken:         token,
 		VisibilityMode:      body.VisibilityMode,
@@ -393,6 +426,12 @@ func (h *Handler) GetSharedPaste(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to load shared paste", http.StatusInternalServerError)
 		return
 	}
+	if row.VaultOnly {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusGone)
+		_, _ = w.Write([]byte(`{"error":"paste unavailable"}`))
+		return
+	}
 	now := time.Now().UTC()
 	if row.RevokedAt.Valid || pastePastExpiry(row.PasteExpiresAt, now) || pastePastExpiry(row.ShareExpiresAt, now) || (len(row.EncryptedTitle) == 0 && len(row.EncryptedContent) == 0) {
 		w.Header().Set("Content-Type", "application/json")
@@ -400,12 +439,17 @@ func (h *Handler) GetSharedPaste(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"error":"paste unavailable"}`))
 		return
 	}
+	pid, _ := uuid.FromBytes(row.PasteID.Bytes[:])
 	resp := sharedPasteResp{
 		Token:            row.PublicToken,
-		VisibilityMode:   row.VisibilityMode,
+		VisibilityMode:   string(row.VisibilityMode),
 		EncryptedTitle:   encodeBase64URL(row.EncryptedTitle),
 		EncryptedContent: encodeBase64URL(row.EncryptedContent),
 		ExpiresAt:        formatExpiresAtJSON(row.ShareExpiresAt),
+		CreatedAt:        row.PasteCreatedAt.Time.UTC().Format(time.RFC3339),
+		OwnerEmail:       row.OwnerEmail,
+		PasteID:          pid.String(),
+		IsEncrypted:      row.IsEncrypted.Bool,
 	}
 	if row.VisibilityMode == "password" {
 		resp.ShareWrapNonce = encodeBase64URL(row.ShareWrapNonce)
@@ -527,6 +571,8 @@ func (h *Handler) GetPaste(w http.ResponseWriter, r *http.Request) {
 		EncryptedTitle:   encodeBase64URL(row.EncryptedTitle),
 		EncryptedContent: encodeBase64URL(row.EncryptedContent),
 		WrappedDek:       encodeBase64URL(row.WrappedDek),
+		IsEncrypted:      row.IsEncrypted.Bool,
+		VaultOnly:        row.VaultOnly,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
@@ -584,6 +630,8 @@ func (h *Handler) ListPastes(w http.ResponseWriter, r *http.Request) {
 			WrappedDek:     encodeBase64URL(row.WrappedDek),
 			ExpiresAt:      formatExpiresAtJSON(row.ExpiresAt),
 			PayloadWiped:   payloadWiped,
+			IsEncrypted:    row.IsEncrypted.Bool,
+			VaultOnly:      row.VaultOnly,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -601,6 +649,8 @@ type dekCoveragePasteResp struct {
 	ExpiresAt           *string  `json:"expires_at,omitempty"`
 	PayloadWiped        bool     `json:"payload_wiped"`
 	DeviceKeyIDsWithDek []string `json:"device_key_ids_with_dek"`
+	IsEncrypted         bool     `json:"is_encrypted"`
+	VaultOnly           bool     `json:"vault_only"`
 }
 
 type dekCoverageResp struct {
@@ -671,6 +721,8 @@ func (h *Handler) PasteDekCoverage(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt:           formatExpiresAtJSON(row.ExpiresAt),
 			PayloadWiped:        row.PayloadWiped,
 			DeviceKeyIDsWithDek: parseDeviceKeyCSV(row.DeviceKeyIdsCsv),
+			IsEncrypted:         row.IsEncrypted.Bool,
+			VaultOnly:           row.VaultOnly,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -687,6 +739,7 @@ type burnedPasteResp struct {
 	BurnedAt            *string  `json:"burned_at,omitempty"`
 	Reason              string   `json:"reason"`
 	DeviceKeyIDsWithDek []string `json:"device_key_ids_with_dek"`
+	VaultOnly           bool     `json:"vault_only"`
 }
 
 type burnedListResp struct {
@@ -761,6 +814,7 @@ func (h *Handler) ListBurnedPastes(w http.ResponseWriter, r *http.Request) {
 			BurnedAt:            formatBurnedAtJSON(row.BurnedAt),
 			Reason:              burnReason(row.BurnedAt, row.ExpiresAt),
 			DeviceKeyIDsWithDek: parseDeviceKeyCSV(row.DeviceKeyIdsCsv),
+			VaultOnly:           row.VaultOnly,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")

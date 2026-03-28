@@ -5,25 +5,11 @@ import { useEffect, useState } from "react";
 import { MdDescription } from "react-icons/md";
 import { Button } from "@swiss/ui";
 import { fetchJson } from "@/app/lib/fetch-json";
+import { formatArtifactTimestamp } from "@/app/lib/format-timestamp";
 import type { SharedPasteMetadataResponse } from "@/src/types/backend";
 
 function format_visibility(mode: string): string {
   return mode === "password" ? "Password" : "Public";
-}
-
-function format_timestamp(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const formatted = new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).format(date);
-  return `${formatted.replace(",", " //")} UTC`;
 }
 
 export default function PublicWorkspace() {
@@ -104,7 +90,7 @@ export default function PublicWorkspace() {
                         {row.encrypted_title || row.paste_id.slice(0, 18)}
                       </p>
                       <p className="mt-1 truncate text-[10px] uppercase tracking-[0.18em] text-(--on-surface-variant)">
-                        {format_timestamp(row.created_at)}
+                        {formatArtifactTimestamp(row.created_at)}
                       </p>
                     </Link>
                   </li>

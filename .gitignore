@@ -53,3 +53,7 @@ services/monolith-api/monolith-api
 # Logs
 logs/
 *.log
+
+# Playwright
+playwright-report/
+test-results/

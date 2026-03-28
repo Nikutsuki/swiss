@@ -1,0 +1,7 @@
+{
+  "name": "@swiss/signaling-api",
+  "private": true,
+  "scripts": {
+    "build": "go build -o dist/signaling-api ."
+  }
+}

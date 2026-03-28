@@ -6,6 +6,8 @@ type EncryptedPasteCreateRequest struct {
 	EncryptedContent string            `json:"encrypted_content"`
 	WrappedDEKs      []WrappedDEKEntry `json:"wrapped_deks"`
 	ExpiresInSeconds *int              `json:"expires_in_seconds,omitempty"`
+	IsEncrypted      bool              `json:"is_encrypted"`
+	VaultOnly        *bool             `json:"vault_only,omitempty"`
 }
 
 // WrappedDEKEntry maps a device key to its wrapped DEK blob (base64).
@@ -20,6 +22,8 @@ type PasteContentResponse struct {
 	EncryptedTitle   string `json:"encrypted_title"`
 	EncryptedContent string `json:"encrypted_content"`
 	WrappedDek       string `json:"wrapped_dek"`
+	IsEncrypted      bool   `json:"is_encrypted"`
+	VaultOnly        bool   `json:"vault_only"`
 }
 
 // PasteMetadataResponse is one row from GET /pastes.
@@ -30,6 +34,8 @@ type PasteMetadataResponse struct {
 	WrappedDek     string  `json:"wrapped_dek"`
 	ExpiresAt      *string `json:"expires_at,omitempty"`
 	PayloadWiped   bool    `json:"payload_wiped"`
+	IsEncrypted    bool    `json:"is_encrypted"`
+	VaultOnly      bool    `json:"vault_only"`
 }
 
 // DekCoveragePasteRow is one paste entry in DekCoverageResponse.
@@ -39,6 +45,8 @@ type DekCoveragePasteRow struct {
 	ExpiresAt           *string  `json:"expires_at,omitempty"`
 	PayloadWiped        bool     `json:"payload_wiped"`
 	DeviceKeyIDsWithDek []string `json:"device_key_ids_with_dek"`
+	IsEncrypted         bool     `json:"is_encrypted"`
+	VaultOnly           bool     `json:"vault_only"`
 }
 
 // DekCoverageResponse is returned by GET /pastes/dek-coverage.
@@ -55,6 +63,7 @@ type BurnedPasteRow struct {
 	BurnedAt            *string  `json:"burned_at,omitempty"`
 	Reason              string   `json:"reason"`
 	DeviceKeyIDsWithDek []string `json:"device_key_ids_with_dek"`
+	VaultOnly           bool     `json:"vault_only"`
 }
 
 // BurnedPastesResponse is returned by GET /pastes/burned.
@@ -104,6 +113,10 @@ type SharedPasteResponse struct {
 	ShareWrapBlob    string              `json:"share_wrap_blob,omitempty"`
 	PasswordKDF      *SharePasswordKDF   `json:"password_kdf,omitempty"`
 	ExpiresAt        *string             `json:"expires_at,omitempty"`
+	CreatedAt        string              `json:"created_at"`
+	OwnerEmail       string              `json:"owner_email"`
+	PasteID          string              `json:"paste_id"`
+	IsEncrypted      bool                `json:"is_encrypted"`
 }
 
 // SharedPasteMetadataResponse is one row from GET /pastes/shared/recent.

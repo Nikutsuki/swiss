@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Input, Modal, Select, Textarea } from "@swiss/ui";
 import { QRCodeSVG } from "qrcode.react";
-import { bytesToBase64Url } from "@/app/lib/b64url";
+import { base64UrlToBytes, bytesToBase64Url } from "@/app/lib/b64url";
 import {
   getDeviceRecord,
   saveDeviceRecord,
@@ -13,6 +13,7 @@ import {
   createEncryptedPastePayload,
   exportSpkiPublic,
   generateDeviceKeyPair,
+  wrapDekForRecipient,
   type DeviceKeyRow,
 } from "@/app/lib/e2ee-paste";
 import {
@@ -118,11 +119,13 @@ export default function NewPasteWorkspace() {
         wrapped_deks: { device_key_id: string; wrapped_dek: string }[];
       };
       let rawDekB64 = "";
+
+      const keys = device ? await fetchJson<DeviceKeyRow[]>("/api/devices/keys") : [];
+
       if (encryptionOption === "encrypted") {
         if (!device) {
-          throw new Error("Enable this device before creating encrypted pastes.");
+          throw new Error("Enable this browser before creating encrypted pastes.");
         }
-        const keys = await fetchJson<DeviceKeyRow[]>("/api/devices/keys");
         if (keys.length === 0) {
           throw new Error("No device keys on the server; set up a device first.");
         }
@@ -130,10 +133,31 @@ export default function NewPasteWorkspace() {
       } else {
         const sharePayload = await createShareablePayload(title, content);
         rawDekB64 = sharePayload.raw_dek_b64;
+
+        // Still wrap for own devices if possible
+        const wrapped_deks: { device_key_id: string; wrapped_dek: string }[] = [];
+        if (keys.length > 0) {
+          const dek = await crypto.subtle.importKey(
+            "raw",
+            base64UrlToBytes(rawDekB64) as BufferSource,
+            { name: "AES-GCM", length: 256 },
+            true,
+            ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
+          );
+          for (const row of keys) {
+            const spki = base64UrlToBytes(row.public_key);
+            const wrapped = await wrapDekForRecipient(dek, spki);
+            wrapped_deks.push({
+              device_key_id: row.device_key_id,
+              wrapped_dek: bytesToBase64Url(wrapped),
+            });
+          }
+        }
+
         payload = {
           encrypted_title: sharePayload.encrypted_title,
           encrypted_content: sharePayload.encrypted_content,
-          wrapped_deks: [],
+          wrapped_deks,
         };
       }
       const sec =
@@ -141,10 +165,12 @@ export default function NewPasteWorkspace() {
       if (sec !== null && (!Number.isFinite(sec) || sec <= 0)) {
         throw new Error("Invalid expiry selection.");
       }
-      const body =
-        sec !== null
-          ? { ...payload, expires_in_seconds: Math.floor(sec) }
-          : payload;
+      const body = {
+        ...payload,
+        is_encrypted: encryptionOption === "encrypted",
+        vault_only: encryptionOption === "encrypted",
+        ...(sec !== null ? { expires_in_seconds: Math.floor(sec) } : {}),
+      };
       const created = await fetchJson<{ id: string }>("/api/pastes", {
         method: "POST",
         body: JSON.stringify(body),

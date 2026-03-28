@@ -11,6 +11,8 @@ export interface EncryptedPasteCreateRequest {
   encrypted_content: string;
   wrapped_deks: WrappedDEKEntry[];
   expires_in_seconds?: number /* int */;
+  is_encrypted: boolean;
+  vault_only?: boolean;
 }
 /**
  * WrappedDEKEntry maps a device key to its wrapped DEK blob (base64).
@@ -27,6 +29,8 @@ export interface PasteContentResponse {
   encrypted_title: string;
   encrypted_content: string;
   wrapped_dek: string;
+  is_encrypted: boolean;
+  vault_only: boolean;
 }
 /**
  * PasteMetadataResponse is one row from GET /pastes.
@@ -38,6 +42,8 @@ export interface PasteMetadataResponse {
   wrapped_dek: string;
   expires_at?: string;
   payload_wiped: boolean;
+  is_encrypted: boolean;
+  vault_only: boolean;
 }
 /**
  * DekCoveragePasteRow is one paste entry in DekCoverageResponse.
@@ -48,6 +54,8 @@ export interface DekCoveragePasteRow {
   expires_at?: string;
   payload_wiped: boolean;
   device_key_ids_with_dek: string[];
+  is_encrypted: boolean;
+  vault_only: boolean;
 }
 /**
  * DekCoverageResponse is returned by GET /pastes/dek-coverage.
@@ -66,6 +74,7 @@ export interface BurnedPasteRow {
   burned_at?: string;
   reason: string;
   device_key_ids_with_dek: string[];
+  vault_only: boolean;
 }
 /**
  * BurnedPastesResponse is returned by GET /pastes/burned.
@@ -116,6 +125,10 @@ export interface SharedPasteResponse {
   share_wrap_blob?: string;
   password_kdf?: SharePasswordKDF;
   expires_at?: string;
+  created_at: string;
+  owner_email: string;
+  paste_id: string;
+  is_encrypted: boolean;
 }
 /**
  * SharedPasteMetadataResponse is one row from GET /pastes/shared/recent.

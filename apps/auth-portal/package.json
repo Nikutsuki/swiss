@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000 -H 0.0.0.0 --experimental-https --experimental-https-key ../../certs/auth.swiss.local-key.pem --experimental-https-cert ../../certs/auth.swiss.local.pem",
-    "dev:http": "next dev -p 3000 -H 0.0.0.0",
-    "build": "next build",
+    "dev": "next dev --webpack -p 3000 -H 0.0.0.0 --experimental-https --experimental-https-key ../../certs/auth.swiss.local-key.pem --experimental-https-cert ../../certs/auth.swiss.local.pem",
+    "dev:http": "next dev --webpack -p 3000 -H 0.0.0.0",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },

@@ -31,11 +31,7 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- [ ] Security/privacy risks identified and mitigations documented (including logging redaction)
-- [ ] API/integration contract impact assessed and migration/compatibility noted
-- [ ] Independent acceptance test approach defined for each user story
-- [ ] Observability/operability requirements defined (logs, metrics, alerts, rollback)
-- [ ] Scope minimized to reversible increments; complexity exceptions justified
+[Gates determined based on constitution file]
 
 ## Project Structure
 

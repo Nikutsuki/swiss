@@ -20,12 +20,12 @@ func main() {
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgresql://root:secretpassword@localhost:5432/utils_db?sslmode=disable"
+		panic("DATABASE_URL environment variable is required")
 	}
 
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+		panic("Failed to connect to database: " + err.Error())
 	}
 	defer pool.Close()
 

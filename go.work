@@ -6,4 +6,6 @@ use (
 	./services/internal/database
 	./services/internal/jwtutil
 	./services/monolith-api
+	./services/monolith-drop-api
+	./services/signaling-api
 )
