@@ -8,5 +8,4 @@ use (
 	./services/monolith-api
 	./services/monolith-drop-api
 	./services/signaling-api
-	./services/monolith-stream-api
 )

@@ -89,17 +89,11 @@ tasks:
     cmds:
       - go run .
 
-  monolith-stream-api:dev:
-    desc: "Runs Monolith Stream API (:8084). Needs JWT_SECRET for chat tokens; optional MONOLITH_STREAM_MAX_PEERS_PER_SESSION, MONOLITH_STREAM_TLS_*."
-    dir: services/monolith-stream-api
-    cmds:
-      - go run .
-
   turbo:dev:
-    desc: "Runs Next apps only. Also run monolith-drop-api:dev (:8082), signaling-api:dev (:8083), and monolith-stream-api:dev (:8084) when those features are needed."
+    desc: "Runs Next apps only. Also run monolith-drop-api:dev (:8082) and signaling-api:dev (:8083) for Drop WebRTC."
     deps: [migrate:up, types:sync]
     cmds:
-      - pnpm turbo dev --parallel --filter monolith --filter auth-portal --filter monolith-drop --filter monolith-stream
+      - pnpm turbo dev --parallel --filter monolith --filter auth-portal --filter monolith-drop
 
   web:dev:
     desc: "Executes the Next.js monolith only"
@@ -122,5 +116,4 @@ tasks:
       - monolith-api:dev
       - monolith-drop-api:dev
       - signaling-api:dev
-      - monolith-stream-api:dev
       - turbo:dev
