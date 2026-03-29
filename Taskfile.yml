@@ -89,15 +89,27 @@ tasks:
     cmds:
       - go run .
 
+  monolith-stream-api:dev:
+    desc: "Runs the Monolith Stream HTTP API (:8084); MONOLITH_STREAM_CORS_ORIGINS optional"
+    dir: services/monolith-stream-api
+    cmds:
+      - go run .
+
   turbo:dev:
-    desc: "Runs Next apps only. Also run monolith-drop-api:dev (:8082) and signaling-api:dev (:8083) for Drop WebRTC."
+    desc: "Runs Next apps only. For Drop WebRTC also run monolith-drop-api:dev (:8082) and signaling-api:dev (:8083); for stream, monolith-stream-api:dev (:8084)."
     deps: [migrate:up, types:sync]
     cmds:
-      - pnpm turbo dev --parallel --filter monolith --filter auth-portal --filter monolith-drop
+      - pnpm turbo dev --parallel --filter monolith --filter auth-portal --filter monolith-drop --filter monolith-stream
 
   web:dev:
     desc: "Executes the Next.js monolith only"
     dir: apps/monolith
+    cmds:
+      - pnpm run dev
+
+  monolith-stream:web:dev:
+    desc: "Executes the monolith-stream Next app only (:3003 HTTPS or run dev:http for plain HTTP)"
+    dir: apps/monolith-stream
     cmds:
       - pnpm run dev
 
@@ -108,6 +120,7 @@ tasks:
       - cd services/auth-api && tygo generate --config tygo.yaml
       - cd services/monolith-drop-api && tygo generate --config tygo.yaml
       - cd services/signaling-api && tygo generate --config tygo.yaml
+      - cd services/monolith-stream-api && tygo generate --config tygo.yaml
 
   dev:
     desc: "Full stack from repo .env — Postgres, migrations, auth-api :8080, monolith-api :8081, Turbo dev (all apps)"
@@ -116,4 +129,5 @@ tasks:
       - monolith-api:dev
       - monolith-drop-api:dev
       - signaling-api:dev
+      - monolith-stream-api:dev
       - turbo:dev

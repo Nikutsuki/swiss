@@ -7,5 +7,6 @@ use (
 	./services/internal/jwtutil
 	./services/monolith-api
 	./services/monolith-drop-api
+	./services/monolith-stream-api
 	./services/signaling-api
 )
