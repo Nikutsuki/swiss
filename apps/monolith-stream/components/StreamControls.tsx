@@ -34,7 +34,7 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
   };
 
   const handleScreenShare = async () => {
-    const stream = await startScreenShare();
+    const stream = await startScreenShare(quality);
     if (stream) onStreamReady(stream, 'screen');
   };
 

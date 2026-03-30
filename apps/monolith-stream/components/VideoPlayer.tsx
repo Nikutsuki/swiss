@@ -102,7 +102,8 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
         try {
           const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream ? video.mozCaptureStream() : null;
           if (stream) {
-            broadcastStream(stream, "file");
+            // Pass only the scalar quality fields so React Hook deps stay accurate.
+            broadcastStream(stream, "file", { resolution: quality.resolution, fps: quality.fps });
           }
         } catch (err) {
           console.error("Failed to capture video stream", err);

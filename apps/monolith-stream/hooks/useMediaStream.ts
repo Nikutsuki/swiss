@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import type { StreamQuality } from "@/components/StreamControls";
 
 export function useMediaStream() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -16,10 +17,25 @@ export function useMediaStream() {
     }
   }, [localStream, localVideoUrl]);
 
-  const startScreenShare = useCallback(async () => {
+  const startScreenShare = useCallback(async (quality: StreamQuality) => {
     try {
+      let idealWidth = 1920;
+      let idealHeight = 1080;
+
+      if (quality.resolution === "720p") {
+        idealWidth = 1280;
+        idealHeight = 720;
+      } else if (quality.resolution === "2k") {
+        idealWidth = 2560;
+        idealHeight = 1440;
+      }
+
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
+        video: {
+          width: { ideal: idealWidth, max: idealWidth },
+          height: { ideal: idealHeight, max: idealHeight },
+          frameRate: { ideal: quality.fps, max: quality.fps },
+        },
         audio: true,
       });
       setLocalStream(stream);

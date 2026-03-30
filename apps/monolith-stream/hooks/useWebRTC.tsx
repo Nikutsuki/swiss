@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { create } from "zustand";
+import type { StreamQuality } from "@/components/StreamControls";
 
 // --- Zustand Store for UI State ---
 interface SyncEvent {
@@ -112,7 +113,7 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
 interface WebRTCContextValue {
   joinLobby: (lobbyId: string) => void;
   leaveLobby: () => void;
-  broadcastStream: (stream: MediaStream | null, mode: StreamMode) => void;
+  broadcastStream: (stream: MediaStream | null, mode: StreamMode, quality?: StreamQuality) => void;
   broadcastStreamMode: (mode: StreamMode) => void;
   broadcastSyncEvent: (action: "play" | "pause" | "seek", time: number) => void;
   sendSyncRequest: (targetPeerId: string, action: "play" | "pause" | "seek", time: number) => void;
@@ -175,6 +176,49 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     const dc = dataChannels.current.get(targetPeerId);
     if (!dc || dc.readyState !== "open") return;
     dc.send(JSON.stringify(message));
+  };
+
+  const enforceCodecPreferences = (pc: RTCPeerConnection) => {
+    if (
+      typeof RTCRtpReceiver === "undefined" ||
+      typeof RTCRtpReceiver.getCapabilities !== "function"
+    ) {
+      return;
+    }
+
+    const capabilities = RTCRtpReceiver.getCapabilities("video");
+    if (!capabilities || !capabilities.codecs) return;
+
+    const vp9 = capabilities.codecs.filter(
+      (c) => c.mimeType.toLowerCase() === "video/vp9",
+    );
+    const h264 = capabilities.codecs.filter(
+      (c) => c.mimeType.toLowerCase() === "video/h264",
+    );
+
+    const preferredCodecs = [...vp9, ...h264, ...capabilities.codecs];
+
+    const uniqueCodecs = preferredCodecs.filter(
+      (codec, index, self) =>
+        index ===
+        self.findIndex(
+          (c) =>
+            c.mimeType === codec.mimeType && c.sdpFmtpLine === codec.sdpFmtpLine,
+        ),
+    );
+
+    pc.getTransceivers().forEach((transceiver) => {
+      const isVideo =
+        transceiver.receiver.track?.kind === "video" ||
+        transceiver.sender.track?.kind === "video";
+      if (!isVideo) return;
+
+      try {
+        transceiver.setCodecPreferences(uniqueCodecs);
+      } catch (err) {
+        console.error("Failed to set codec preferences on transceiver", err);
+      }
+    });
   };
 
   const createPeerConnection = (targetPeerId: string, polite: boolean) => {
@@ -251,8 +295,13 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current!));
+      localStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStreamRef.current!);
+      });
     }
+
+    // Apply codec preferences to offerers immediately after tracks/transceivers exist.
+    enforceCodecPreferences(pc);
 
     // We don't manually createOffer here anymore, onnegotiationneeded will handle it when tracks are added
     // But if there are no tracks, we should force it if not polite
@@ -297,7 +346,13 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
         if (!pc) {
           pc = createPeerConnection(peer_id, true);
         }
+        // 1. Process the incoming offer (creates the video transceiver)
         await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sdp)));
+
+        // 2. Enforce preferences on the newly created transceiver
+        enforceCodecPreferences(pc);
+
+        // 3. Generate the answer matching the enforced preferences
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         wsRef.current?.send(JSON.stringify({
@@ -454,7 +509,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     peerConnections.current.clear();
   }, []);
 
-  const broadcastStream = useCallback((stream: MediaStream | null, mode: StreamMode) => {
+  const broadcastStream = useCallback((stream: MediaStream | null, mode: StreamMode, quality?: StreamQuality) => {
     localStreamRef.current = stream;
 
     // Keep stream mode updated so peers can decide when to show playback controls.
@@ -465,17 +520,46 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     const videoTrack = stream?.getVideoTracks()[0] || null;
     const audioTrack = stream?.getAudioTracks()[0] || null;
 
+    // Hint to the encoder to prioritize detail for screen shares.
+    if (videoTrack && mode === "screen") {
+      // Not all browsers have this typed on MediaStreamTrack; keep it safe.
+      (videoTrack as unknown as { contentHint?: string }).contentHint = "detail";
+    }
+
     // Update all existing peer connections
     peerConnections.current.forEach(async (pc) => {
       const senders = pc.getSenders();
 
       // Handle Video Track
       if (videoTrack) {
-        const sender = senders.find(s => s.track?.kind === "video");
-        if (sender) {
-          sender.replaceTrack(videoTrack);
-        } else {
-          pc.addTrack(videoTrack, stream!);
+        let sender = senders.find((s) => s.track?.kind === "video") ?? null;
+        if (sender) sender.replaceTrack(videoTrack);
+        else sender = pc.addTrack(videoTrack, stream!);
+
+        // Apply encoder config.
+        if (sender && quality) {
+          try {
+            const params = sender.getParameters();
+
+            // Ensure encodings array exists.
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+
+            const bitrateMap: Record<StreamQuality["resolution"], number> = {
+              "720p": 2500000,
+              "1080p": 10000000,
+              "2k": 15000000,
+            };
+
+            params.encodings[0].maxBitrate = bitrateMap[quality.resolution];
+            params.encodings[0].maxFramerate = quality.fps;
+            params.degradationPreference = "maintain-resolution";
+
+            await sender.setParameters(params);
+          } catch (error) {
+            console.error("Failed to set video sender parameters", error);
+          }
         }
       } else {
         const sender = senders.find(s => s.track?.kind === "video");
