@@ -100,8 +100,14 @@ function CustomControls({
     else if (syncEvent.action === "pause") setIsPlaying(false);
 
     if (!isScrubbingRef.current) {
-      playStateRef.current = { baseTime: syncEvent.time, startedAt: Date.now() };
-      setLocalTime(syncEvent.time);
+      let actualTime = syncEvent.time;
+      if (syncEvent.action === "play") {
+        const elapsedSinceEvent = (Date.now() - syncEvent.timestamp) / 1000;
+        actualTime += Math.max(0, elapsedSinceEvent);
+      }
+
+      playStateRef.current = { baseTime: actualTime, startedAt: Date.now() };
+      setLocalTime(actualTime);
     }
   }, [syncEvent, isLiveStream]);
 
@@ -210,6 +216,8 @@ interface VideoViewProps {
   syncEvent?: { action: string; time: number; timestamp: number };
   isRemoteStream?: boolean;
   isRemoteFile?: boolean;
+  isLiveStream?: boolean;
+  isLocal?: boolean;
   onPlay?: (time: number) => void;
   onPause?: (time: number) => void;
   onSeeked?: (time: number) => void;
@@ -225,6 +233,8 @@ function VideoView({
   syncEvent,
   isRemoteStream = false,
   isRemoteFile = false,
+  isLiveStream = false,
+  isLocal = false,
   onPlay,
   onPause,
   onSeeked,
@@ -274,12 +284,29 @@ function VideoView({
     }
   }, [stream, isRemoteFile]);
 
+  // Network Sync Loop & Remount Recovery
   useEffect(() => {
     const videoEl = videoRef.current;
-    if (!videoEl || !syncEvent || !isRemoteFile) return;
+    if (!videoEl || !syncEvent || isLiveStream) return;
 
-    if (Math.abs(videoEl.currentTime - syncEvent.time) > 1) {
-      videoEl.currentTime = syncEvent.time;
+    let targetTime = syncEvent.time;
+    if (syncEvent.action === "play") {
+      const elapsed = (Date.now() - syncEvent.timestamp) / 1000;
+      targetTime += Math.max(0, elapsed);
+    }
+
+    if (isLocal) {
+      if (videoEl.currentTime < 1 && targetTime > 1) {
+        videoEl.currentTime = targetTime;
+        if (syncEvent.action === "play") {
+          videoEl.play().catch(() => undefined);
+        }
+      }
+      return;
+    }
+
+    if (Math.abs(videoEl.currentTime - targetTime) > 1) {
+      videoEl.currentTime = targetTime;
     }
 
     if (syncEvent.action === "play" && videoEl.paused) {
@@ -294,7 +321,7 @@ function VideoView({
     } else if (syncEvent.action === "pause" && !videoEl.paused) {
       videoEl.pause();
     }
-  }, [syncEvent, isRemoteFile]);
+  }, [syncEvent, isLiveStream, isLocal]);
 
   if (!stream) return null;
 
@@ -540,6 +567,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
               label={`Peer ${peerId.substring(0, 5)}`}
               isRemoteStream={true}
               isRemoteFile={isFileMode}
+              isLiveStream={!isFileMode}
               duration={durationsByPeer[peerId]}
               syncEvent={syncEventsByPeer[peerId]}
               onPlay={isFileMode ? (time) => handleRemotePlay(peerId, time) : undefined}
@@ -598,6 +626,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
               label={`Peer ${peerId.substring(0, 5)}`}
               isRemoteStream={true}
               isRemoteFile={isFileMode}
+              isLiveStream={!isFileMode}
               duration={durationsByPeer[peerId]}
               syncEvent={syncEventsByPeer[peerId]}
               onPlay={isFileMode ? (time) => handleRemotePlay(peerId, time) : undefined}
