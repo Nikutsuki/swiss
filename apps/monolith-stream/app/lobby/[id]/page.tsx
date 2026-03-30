@@ -5,7 +5,7 @@ import { useWebRTC, WebRTCProvider } from "@/hooks/useWebRTC";
 import { useWebRTCStore } from "@/hooks/useWebRTC";
 import { ShareLobby } from "@/components/ShareLobby";
 import { ParticipantList } from "@/components/ParticipantList";
-import { StreamControls } from "@/components/StreamControls";
+import { StreamControls, type StreamQuality } from "@/components/StreamControls";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Chat } from "@/components/Chat";
 
@@ -14,17 +14,28 @@ function LobbyContent({ id }: { id: string }) {
   const { error } = useWebRTCStore();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
+  const [quality, setQuality] = useState<StreamQuality>({
+    resolution: "1080p",
+    fps: 60,
+  });
 
   useEffect(() => {
     joinLobby(id);
   }, [id, joinLobby]);
+
+  // If we're currently screen-sharing, re-apply sender encoding limits when quality changes.
+  useEffect(() => {
+    if (!localStream) return;
+    if (localVideoUrl) return; // local file mode
+    broadcastStream(localStream, "screen", quality);
+  }, [broadcastStream, localStream, localVideoUrl, quality]);
 
   const handleStreamReady = (stream: MediaStream | null, type: 'screen' | 'file' | 'none', url?: string | null) => {
     setLocalStream(type === 'screen' ? stream : null);
     setLocalVideoUrl(type === 'file' ? (url || null) : null);
     
     if (type === 'screen' || type === 'none') {
-      broadcastStream(stream);
+      broadcastStream(stream, type, quality);
     } else if (type === 'file') {
       // For files, we clear current screen broadcast in VideoPlayer's effect
       // to avoid multiple rapid track updates.
@@ -39,8 +50,12 @@ function LobbyContent({ id }: { id: string }) {
         </div>
       )}
       <div className="lg:col-span-3 flex flex-col gap-6">
-        <StreamControls onStreamReady={handleStreamReady} />
-        <VideoPlayer localStream={localStream} localVideoUrl={localVideoUrl} />
+        <StreamControls
+          onStreamReady={handleStreamReady}
+          quality={quality}
+          onQualityChange={setQuality}
+        />
+        <VideoPlayer localStream={localStream} localVideoUrl={localVideoUrl} quality={quality} />
       </div>
       <div className="lg:col-span-1 flex flex-col gap-6 h-full">
         <ParticipantList />

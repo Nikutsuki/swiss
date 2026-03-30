@@ -11,6 +11,15 @@ interface SyncEvent {
   timestamp: number;
 }
 
+type StreamMode = "none" | "screen" | "file";
+
+interface SyncRequest {
+  action: "play" | "pause" | "seek";
+  time: number;
+  timestamp: number;
+  requestedByPeerId: string;
+}
+
 interface ChatMessage {
   text: string;
   timestamp: number;
@@ -24,7 +33,12 @@ interface WebRTCState {
   error: string | null;
   participants: string[];
   remoteStreams: Record<string, MediaStream>;
-  lastSyncEvent: SyncEvent | null;
+  // Stream mode (screen/file/none) keyed by peerId. Used to decide when to show controls.
+  streamModesByPeer: Record<string, StreamMode>;
+  // Latest sync event for each stream source peerId.
+  syncEventsByPeer: Record<string, SyncEvent | undefined>;
+  // Latest sync request received by the local peer (only meaningful if local peer is the streamer).
+  incomingSyncRequest: SyncRequest | null;
   chatMessages: ChatMessage[];
   setPeerId: (id: string) => void;
   setLobbyId: (id: string | null) => void;
@@ -34,7 +48,9 @@ interface WebRTCState {
   removeParticipant: (id: string) => void;
   addRemoteStream: (id: string, stream: MediaStream) => void;
   removeRemoteStream: (id: string) => void;
-  setLastSyncEvent: (event: SyncEvent) => void;
+  setStreamModeByPeer: (peerId: string, mode: StreamMode) => void;
+  setSyncEventByPeer: (peerId: string, event: SyncEvent) => void;
+  setIncomingSyncRequest: (req: SyncRequest | null) => void;
   addChatMessage: (msg: ChatMessage) => void;
   clearParticipants: () => void;
 }
@@ -46,7 +62,9 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
   error: null,
   participants: [],
   remoteStreams: {},
-  lastSyncEvent: null,
+  streamModesByPeer: {},
+  syncEventsByPeer: {},
+  incomingSyncRequest: null,
   chatMessages: [],
   setPeerId: (id) => set({ peerId: id }),
   setLobbyId: (id) => set({ lobbyId: id }),
@@ -57,9 +75,13 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
   })),
   removeParticipant: (id) => set((state) => {
     const { [id]: _, ...rest } = state.remoteStreams;
+    const { [id]: _streamMode, ...restStreamModesByPeer } = state.streamModesByPeer;
+    const { [id]: _syncEvent, ...restSyncEventsByPeer } = state.syncEventsByPeer;
     return { 
       participants: state.participants.filter((p) => p !== id),
-      remoteStreams: rest
+      remoteStreams: rest,
+      streamModesByPeer: restStreamModesByPeer,
+      syncEventsByPeer: restSyncEventsByPeer,
     };
   }),
   addRemoteStream: (id, stream) => set((state) => ({
@@ -69,17 +91,31 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
     const { [id]: _, ...rest } = state.remoteStreams;
     return { remoteStreams: rest };
   }),
-  setLastSyncEvent: (event) => set({ lastSyncEvent: event }),
+  setStreamModeByPeer: (peerId, mode) =>
+    set((state) => ({ streamModesByPeer: { ...state.streamModesByPeer, [peerId]: mode } })),
+  setSyncEventByPeer: (peerId, event) =>
+    set((state) => ({ syncEventsByPeer: { ...state.syncEventsByPeer, [peerId]: event } })),
+  setIncomingSyncRequest: (req) => set({ incomingSyncRequest: req }),
   addChatMessage: (msg) => set((state) => ({ chatMessages: [...state.chatMessages, msg] })),
-  clearParticipants: () => set({ participants: [], remoteStreams: {}, chatMessages: [], lastSyncEvent: null }),
+  clearParticipants: () =>
+    set({
+      participants: [],
+      remoteStreams: {},
+      chatMessages: [],
+      streamModesByPeer: {},
+      syncEventsByPeer: {},
+      incomingSyncRequest: null,
+    }),
 }));
 
 // --- Context for WebRTC actions ---
 interface WebRTCContextValue {
   joinLobby: (lobbyId: string) => void;
   leaveLobby: () => void;
-  broadcastStream: (stream: MediaStream | null) => void;
+  broadcastStream: (stream: MediaStream | null, mode: StreamMode) => void;
+  broadcastStreamMode: (mode: StreamMode) => void;
   broadcastSyncEvent: (action: "play" | "pause" | "seek", time: number) => void;
+  sendSyncRequest: (targetPeerId: string, action: "play" | "pause" | "seek", time: number) => void;
   broadcastChatMessage: (text: string) => void;
 }
 
@@ -107,7 +143,14 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     try {
       const msg = JSON.parse(event.data);
       if (msg.type === "sync") {
-        useWebRTCStore.getState().setLastSyncEvent(msg.payload);
+        useWebRTCStore.getState().setSyncEventByPeer(senderId, msg.payload);
+      } else if (msg.type === "sync_request") {
+        useWebRTCStore.getState().setIncomingSyncRequest({
+          ...msg.payload,
+          requestedByPeerId: senderId,
+        });
+      } else if (msg.type === "stream_mode") {
+        useWebRTCStore.getState().setStreamModeByPeer(senderId, msg.payload.mode);
       } else if (msg.type === "chat") {
         useWebRTCStore.getState().addChatMessage({
           ...msg.payload,
@@ -126,6 +169,12 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
         dc.send(data);
       }
     });
+  };
+
+  const sendDataMessageToPeer = (targetPeerId: string, message: any) => {
+    const dc = dataChannels.current.get(targetPeerId);
+    if (!dc || dc.readyState !== "open") return;
+    dc.send(JSON.stringify(message));
   };
 
   const createPeerConnection = (targetPeerId: string, polite: boolean) => {
@@ -167,11 +216,37 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
       const dc = pc.createDataChannel("watch-together-data");
       dc.onmessage = (e) => handleDataChannelMessage(e, targetPeerId);
       dataChannels.current.set(targetPeerId, dc);
+      dc.onopen = () => {
+        // Push current stream mode + latest sync state to late joiners.
+        const myPeerId = useWebRTCStore.getState().peerId;
+        const mode = useWebRTCStore.getState().streamModesByPeer[myPeerId] ?? "none";
+        sendDataMessageToPeer(targetPeerId, { type: "stream_mode", payload: { mode } });
+
+        if (mode === "file") {
+          const sync = useWebRTCStore.getState().syncEventsByPeer[myPeerId];
+          if (sync) {
+            sendDataMessageToPeer(targetPeerId, { type: "sync", payload: sync });
+          }
+        }
+      };
     } else {
       pc.ondatachannel = (event) => {
         const dc = event.channel;
         dc.onmessage = (e) => handleDataChannelMessage(e, targetPeerId);
         dataChannels.current.set(targetPeerId, dc);
+        dc.onopen = () => {
+          // Push current stream mode + latest sync state to late joiners.
+          const myPeerId = useWebRTCStore.getState().peerId;
+          const mode = useWebRTCStore.getState().streamModesByPeer[myPeerId] ?? "none";
+          sendDataMessageToPeer(targetPeerId, { type: "stream_mode", payload: { mode } });
+
+          if (mode === "file") {
+            const sync = useWebRTCStore.getState().syncEventsByPeer[myPeerId];
+            if (sync) {
+              sendDataMessageToPeer(targetPeerId, { type: "sync", payload: sync });
+            }
+          }
+        };
       };
     }
 
@@ -379,11 +454,17 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     peerConnections.current.clear();
   }, []);
 
-  const broadcastStream = useCallback((stream: MediaStream | null) => {
+  const broadcastStream = useCallback((stream: MediaStream | null, mode: StreamMode) => {
     localStreamRef.current = stream;
+
+    // Keep stream mode updated so peers can decide when to show playback controls.
+    const myPeerId = useWebRTCStore.getState().peerId;
+    useWebRTCStore.getState().setStreamModeByPeer(myPeerId, mode);
+    broadcastDataMessage({ type: "stream_mode", payload: { mode } });
+
     const videoTrack = stream?.getVideoTracks()[0] || null;
     const audioTrack = stream?.getAudioTracks()[0] || null;
-    
+
     // Update all existing peer connections
     peerConnections.current.forEach(async (pc) => {
       const senders = pc.getSenders();
@@ -413,16 +494,30 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
         const sender = senders.find(s => s.track?.kind === "audio");
         if (sender) pc.removeTrack(sender);
       }
-      
+
       // Renegotiation is handled implicitly if negotiationneeded fires
     });
   }, []);
 
+  const broadcastStreamMode = useCallback((mode: StreamMode) => {
+    const myPeerId = useWebRTCStore.getState().peerId;
+    useWebRTCStore.getState().setStreamModeByPeer(myPeerId, mode);
+    broadcastDataMessage({ type: "stream_mode", payload: { mode } });
+  }, []);
+
   const broadcastSyncEvent = useCallback((action: "play" | "pause" | "seek", time: number) => {
     const payload = { action, time, timestamp: Date.now() };
+    const myPeerId = useWebRTCStore.getState().peerId;
+
     broadcastDataMessage({ type: "sync", payload });
-    // Also apply locally
-    useWebRTCStore.getState().setLastSyncEvent(payload);
+
+    // Also apply locally for the local streamer.
+    useWebRTCStore.getState().setSyncEventByPeer(myPeerId, payload);
+  }, []);
+
+  const sendSyncRequest = useCallback((targetPeerId: string, action: "play" | "pause" | "seek", time: number) => {
+    const payload = { action, time, timestamp: Date.now() };
+    sendDataMessageToPeer(targetPeerId, { type: "sync_request", payload });
   }, []);
 
   const broadcastChatMessage = useCallback((text: string) => {
@@ -442,8 +537,22 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
   }, [leaveLobby]);
 
   const contextValue = React.useMemo(() => ({
-    joinLobby, leaveLobby, broadcastStream, broadcastSyncEvent, broadcastChatMessage
-  }), [joinLobby, leaveLobby, broadcastStream, broadcastSyncEvent, broadcastChatMessage]);
+    joinLobby,
+    leaveLobby,
+    broadcastStream,
+    broadcastStreamMode,
+    broadcastSyncEvent,
+    sendSyncRequest,
+    broadcastChatMessage,
+  }), [
+    joinLobby,
+    leaveLobby,
+    broadcastStream,
+    broadcastStreamMode,
+    broadcastSyncEvent,
+    sendSyncRequest,
+    broadcastChatMessage,
+  ]);
 
   return (
     <WebRTCContext.Provider value={contextValue}>

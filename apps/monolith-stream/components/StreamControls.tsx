@@ -5,15 +5,33 @@ import { Button, Card, CardBody } from "@swiss/ui";
 import { MonitorUp, FileVideo, X } from "lucide-react";
 import { useMediaStream } from "@/hooks/useMediaStream";
 
+export type StreamQuality = {
+  resolution: "720p" | "1080p" | "2k";
+  fps: 30 | 60;
+};
+
 interface StreamControlsProps {
   onStreamReady: (stream: MediaStream | null, type: 'screen' | 'file' | 'none', url?: string | null) => void;
+  quality: StreamQuality;
+  onQualityChange: (quality: StreamQuality) => void;
 }
 
-export function StreamControls({ onStreamReady }: StreamControlsProps) {
+export function StreamControls({ onStreamReady, quality, onQualityChange }: StreamControlsProps) {
   const { startScreenShare, startLocalFile, stopStream, localStream, localVideoUrl, error } = useMediaStream();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const activeType = localStream ? 'screen' : localVideoUrl ? 'file' : 'none';
+
+  const handleFpsChange = (nextFps: number) => {
+    const fps = nextFps === 30 ? 30 : 60;
+    onQualityChange({ ...quality, fps });
+  };
+
+  const handleResolutionChange = (next: string) => {
+    if (next === "720p" || next === "1080p" || next === "2k") {
+      onQualityChange({ ...quality, resolution: next });
+    }
+  };
 
   const handleScreenShare = async () => {
     const stream = await startScreenShare();
@@ -60,6 +78,30 @@ export function StreamControls({ onStreamReady }: StreamControlsProps) {
             <X className="w-4 h-4 mr-2" /> Stop Streaming {activeType === 'screen' ? 'Screen' : 'File'}
           </Button>
         )}
+      </CardBody>
+      <CardBody className="flex flex-col gap-3 !mt-0 pt-0">
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-(--on-surface-variant) whitespace-nowrap">Stream Quality</div>
+          <div className="flex-1 grid grid-cols-2 gap-2">
+            <select
+              value={quality.resolution}
+              onChange={(e) => handleResolutionChange(e.target.value)}
+              className="bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
+            >
+              <option value="720p">720p</option>
+              <option value="1080p">1080p</option>
+              <option value="2k">2K</option>
+            </select>
+            <select
+              value={quality.fps}
+              onChange={(e) => handleFpsChange(Number(e.target.value))}
+              className="bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
+            >
+              <option value={30}>30 fps</option>
+              <option value={60}>60 fps</option>
+            </select>
+          </div>
+        </div>
       </CardBody>
       {error && <p className="text-[#ffb4ab] text-xs px-6 pb-4">{error}</p>}
     </Card>
