@@ -11,12 +11,13 @@ import { Chat } from "@/components/Chat";
 
 function LobbyContent({ id }: { id: string }) {
   const { joinLobby, broadcastStream } = useWebRTC();
-  const { error } = useWebRTCStore();
+  const { error, theaterMode } = useWebRTCStore();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
   const [quality, setQuality] = useState<StreamQuality>({
     resolution: "1080p",
     fps: 60,
+    bitrateMbps: 8,
   });
 
   useEffect(() => {
@@ -43,24 +44,30 @@ function LobbyContent({ id }: { id: string }) {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 min-h-screen">
-      {error && (
+    <div className={theaterMode ? "flex h-screen bg-black p-4 gap-4" : "grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 min-h-screen"}>
+      {error && !theaterMode && (
         <div className="lg:col-span-4 bg-[#ffb4ab]/15 border border-[#ffb4ab]/30 text-[#ffb4ab] px-4 py-3 rounded-md flex justify-between items-center">
           <p className="text-sm font-medium">{error}</p>
         </div>
       )}
-      <div className="lg:col-span-3 flex flex-col gap-6">
-        <StreamControls
-          onStreamReady={handleStreamReady}
-          quality={quality}
-          onQualityChange={setQuality}
-        />
-        <VideoPlayer localStream={localStream} localVideoUrl={localVideoUrl} quality={quality} />
+      <div className={theaterMode ? "flex-1 flex flex-col min-w-0" : "lg:col-span-3 flex flex-col gap-6"}>
+        {!theaterMode && (
+          <StreamControls
+            onStreamReady={handleStreamReady}
+            quality={quality}
+            onQualityChange={setQuality}
+          />
+        )}
+        <div className={theaterMode ? "flex-1 min-h-0 relative" : ""}>
+          <VideoPlayer localStream={localStream} localVideoUrl={localVideoUrl} quality={quality} />
+        </div>
       </div>
-      <div className="lg:col-span-1 flex flex-col gap-6 h-full">
-        <ParticipantList />
-        <Chat />
-        <ShareLobby lobbyId={id} />
+      <div className={theaterMode ? "w-80 flex flex-col shrink-0" : "lg:col-span-1 flex flex-col gap-6 h-full"}>
+        {!theaterMode && <ParticipantList />}
+        <div className={theaterMode ? "flex-1 min-h-0" : ""}>
+          <Chat />
+        </div>
+        {!theaterMode && <ShareLobby lobbyId={id} />}
       </div>
     </div>
   );

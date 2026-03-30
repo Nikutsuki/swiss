@@ -8,6 +8,7 @@ import { useMediaStream } from "@/hooks/useMediaStream";
 export type StreamQuality = {
   resolution: "720p" | "1080p" | "2k";
   fps: 30 | 60;
+  bitrateMbps: number;
 };
 
 interface StreamControlsProps {
@@ -31,6 +32,11 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
     if (next === "720p" || next === "1080p" || next === "2k") {
       onQualityChange({ ...quality, resolution: next });
     }
+  };
+
+  const handleBitrateChange = (nextMbps: number) => {
+    const bitrateMbps = Number.isFinite(nextMbps) && nextMbps > 0 ? nextMbps : 8;
+    onQualityChange({ ...quality, bitrateMbps });
   };
 
   const handleScreenShare = async () => {
@@ -81,8 +87,8 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
       </CardBody>
       <CardBody className="flex flex-col gap-3 !mt-0 pt-0">
         <div className="flex items-center gap-3">
-          <div className="text-xs text-(--on-surface-variant) whitespace-nowrap">Stream Quality</div>
-          <div className="flex-1 grid grid-cols-2 gap-2">
+          <div className="text-xs text-(--on-surface-variant) whitespace-nowrap">Stream Config</div>
+          <div className="flex-1 grid grid-cols-3 gap-2">
             <select
               value={quality.resolution}
               onChange={(e) => handleResolutionChange(e.target.value)}
@@ -99,6 +105,17 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
             >
               <option value={30}>30 fps</option>
               <option value={60}>60 fps</option>
+            </select>
+            <select
+              value={quality.bitrateMbps}
+              onChange={(e) => handleBitrateChange(Number(e.target.value))}
+              className="bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
+            >
+              <option value={2}>2 Mbps</option>
+              <option value={5}>5 Mbps</option>
+              <option value={8}>8 Mbps</option>
+              <option value={15}>15 Mbps</option>
+              <option value={25}>25 Mbps</option>
             </select>
           </div>
         </div>

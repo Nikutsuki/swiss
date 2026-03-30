@@ -32,12 +32,15 @@ interface WebRTCState {
   lobbyId: string | null;
   isConnected: boolean;
   error: string | null;
+  theaterMode: boolean;
   participants: string[];
   remoteStreams: Record<string, MediaStream>;
   // Stream mode (screen/file/none) keyed by peerId. Used to decide when to show controls.
   streamModesByPeer: Record<string, StreamMode>;
   // Latest sync event for each stream source peerId.
   syncEventsByPeer: Record<string, SyncEvent | undefined>;
+  // Source file duration keyed by peerId (for remote scrubbing UI).
+  durationsByPeer: Record<string, number>;
   // Latest sync request received by the local peer (only meaningful if local peer is the streamer).
   incomingSyncRequest: SyncRequest | null;
   chatMessages: ChatMessage[];
@@ -51,8 +54,10 @@ interface WebRTCState {
   removeRemoteStream: (id: string) => void;
   setStreamModeByPeer: (peerId: string, mode: StreamMode) => void;
   setSyncEventByPeer: (peerId: string, event: SyncEvent) => void;
+  setDurationByPeer: (peerId: string, duration: number) => void;
   setIncomingSyncRequest: (req: SyncRequest | null) => void;
   addChatMessage: (msg: ChatMessage) => void;
+  toggleTheaterMode: () => void;
   clearParticipants: () => void;
 }
 
@@ -61,10 +66,12 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
   lobbyId: null,
   isConnected: false,
   error: null,
+  theaterMode: false,
   participants: [],
   remoteStreams: {},
   streamModesByPeer: {},
   syncEventsByPeer: {},
+  durationsByPeer: {},
   incomingSyncRequest: null,
   chatMessages: [],
   setPeerId: (id) => set({ peerId: id }),
@@ -78,11 +85,13 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
     const { [id]: _, ...rest } = state.remoteStreams;
     const { [id]: _streamMode, ...restStreamModesByPeer } = state.streamModesByPeer;
     const { [id]: _syncEvent, ...restSyncEventsByPeer } = state.syncEventsByPeer;
+    const { [id]: _duration, ...restDurationsByPeer } = state.durationsByPeer;
     return { 
       participants: state.participants.filter((p) => p !== id),
       remoteStreams: rest,
       streamModesByPeer: restStreamModesByPeer,
       syncEventsByPeer: restSyncEventsByPeer,
+      durationsByPeer: restDurationsByPeer,
     };
   }),
   addRemoteStream: (id, stream) => set((state) => ({
@@ -96,8 +105,11 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
     set((state) => ({ streamModesByPeer: { ...state.streamModesByPeer, [peerId]: mode } })),
   setSyncEventByPeer: (peerId, event) =>
     set((state) => ({ syncEventsByPeer: { ...state.syncEventsByPeer, [peerId]: event } })),
+  setDurationByPeer: (peerId, duration) =>
+    set((state) => ({ durationsByPeer: { ...state.durationsByPeer, [peerId]: duration } })),
   setIncomingSyncRequest: (req) => set({ incomingSyncRequest: req }),
   addChatMessage: (msg) => set((state) => ({ chatMessages: [...state.chatMessages, msg] })),
+  toggleTheaterMode: () => set((state) => ({ theaterMode: !state.theaterMode })),
   clearParticipants: () =>
     set({
       participants: [],
@@ -105,7 +117,9 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
       chatMessages: [],
       streamModesByPeer: {},
       syncEventsByPeer: {},
+      durationsByPeer: {},
       incomingSyncRequest: null,
+      theaterMode: false,
     }),
 }));
 
@@ -116,6 +130,7 @@ interface WebRTCContextValue {
   broadcastStream: (stream: MediaStream | null, mode: StreamMode, quality?: StreamQuality) => void;
   broadcastStreamMode: (mode: StreamMode) => void;
   broadcastSyncEvent: (action: "play" | "pause" | "seek", time: number) => void;
+  broadcastDuration: (duration: number) => void;
   sendSyncRequest: (targetPeerId: string, action: "play" | "pause" | "seek", time: number) => void;
   broadcastChatMessage: (text: string) => void;
 }
@@ -133,6 +148,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
+  const activeQualityRef = useRef<StreamQuality | null>(null);
   const store = useWebRTCStore();
 
   // Initialize peer ID
@@ -152,6 +168,8 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
         });
       } else if (msg.type === "stream_mode") {
         useWebRTCStore.getState().setStreamModeByPeer(senderId, msg.payload.mode);
+      } else if (msg.type === "duration") {
+        useWebRTCStore.getState().setDurationByPeer(senderId, msg.payload.duration);
       } else if (msg.type === "chat") {
         useWebRTCStore.getState().addChatMessage({
           ...msg.payload,
@@ -221,6 +239,42 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const enforceSdpBitrate = (sdp: string, targetKbps: number) => {
+    const kbps = Math.max(1, Math.floor(targetKbps));
+    const tiasBps = kbps * 1000;
+
+    const lines = sdp.split(/\r\n/);
+    let inVideo = false;
+    let inserted = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line.startsWith("m=")) {
+        inVideo = line.startsWith("m=video");
+        inserted = false;
+        continue;
+      }
+
+      if (!inVideo) continue;
+
+      // Remove existing bandwidth constraints for this m-section.
+      if (line.startsWith("b=AS:") || line.startsWith("b=TIAS:")) {
+        lines[i] = "";
+        continue;
+      }
+
+      // Insert bandwidth constraints just after the connection line.
+      if (!inserted && line.startsWith("c=")) {
+        lines.splice(i + 1, 0, `b=AS:${kbps}`, `b=TIAS:${tiasBps}`);
+        inserted = true;
+        i += 2;
+      }
+    }
+
+    return lines.filter((l) => l !== "").join("\r\n");
+  };
+
   const createPeerConnection = (targetPeerId: string, polite: boolean) => {
     const pc = new RTCPeerConnection(STUN_SERVERS);
     peerConnections.current.set(targetPeerId, pc);
@@ -244,6 +298,8 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     pc.onnegotiationneeded = async () => {
       try {
         const offer = await pc.createOffer();
+        const targetKbps = (activeQualityRef.current?.bitrateMbps ?? 8) * 1000;
+        if (offer.sdp) offer.sdp = enforceSdpBitrate(offer.sdp, targetKbps);
         await pc.setLocalDescription(offer);
         wsRef.current?.send(JSON.stringify({
           type: "offer",
@@ -268,8 +324,12 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
 
         if (mode === "file") {
           const sync = useWebRTCStore.getState().syncEventsByPeer[myPeerId];
+          const duration = useWebRTCStore.getState().durationsByPeer[myPeerId];
           if (sync) {
             sendDataMessageToPeer(targetPeerId, { type: "sync", payload: sync });
+          }
+          if (typeof duration === "number" && Number.isFinite(duration)) {
+            sendDataMessageToPeer(targetPeerId, { type: "duration", payload: { duration } });
           }
         }
       };
@@ -286,8 +346,12 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
 
           if (mode === "file") {
             const sync = useWebRTCStore.getState().syncEventsByPeer[myPeerId];
+            const duration = useWebRTCStore.getState().durationsByPeer[myPeerId];
             if (sync) {
               sendDataMessageToPeer(targetPeerId, { type: "sync", payload: sync });
+            }
+            if (typeof duration === "number" && Number.isFinite(duration)) {
+              sendDataMessageToPeer(targetPeerId, { type: "duration", payload: { duration } });
             }
           }
         };
@@ -307,6 +371,8 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     // But if there are no tracks, we should force it if not polite
     if (!polite && (!localStreamRef.current || localStreamRef.current.getTracks().length === 0)) {
       pc.createOffer().then((offer) => {
+        const targetKbps = (activeQualityRef.current?.bitrateMbps ?? 8) * 1000;
+        if (offer.sdp) offer.sdp = enforceSdpBitrate(offer.sdp, targetKbps);
         pc.setLocalDescription(offer);
         wsRef.current?.send(JSON.stringify({
           type: "offer",
@@ -354,6 +420,8 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
 
         // 3. Generate the answer matching the enforced preferences
         const answer = await pc.createAnswer();
+        const targetKbps = (activeQualityRef.current?.bitrateMbps ?? 8) * 1000;
+        if (answer.sdp) answer.sdp = enforceSdpBitrate(answer.sdp, targetKbps);
         await pc.setLocalDescription(answer);
         wsRef.current?.send(JSON.stringify({
           type: "answer",
@@ -511,6 +579,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
 
   const broadcastStream = useCallback((stream: MediaStream | null, mode: StreamMode, quality?: StreamQuality) => {
     localStreamRef.current = stream;
+    if (quality) activeQualityRef.current = quality;
 
     // Keep stream mode updated so peers can decide when to show playback controls.
     const myPeerId = useWebRTCStore.getState().peerId;
@@ -546,13 +615,10 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
               params.encodings = [{}];
             }
 
-            const bitrateMap: Record<StreamQuality["resolution"], number> = {
-              "720p": 2500000,
-              "1080p": 10000000,
-              "2k": 15000000,
-            };
-
-            params.encodings[0].maxBitrate = bitrateMap[quality.resolution];
+            params.encodings[0].maxBitrate = Math.max(
+              1_000_000,
+              Math.floor(quality.bitrateMbps * 1_000_000),
+            );
             params.encodings[0].maxFramerate = quality.fps;
             params.degradationPreference = "maintain-resolution";
 
@@ -599,6 +665,12 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     useWebRTCStore.getState().setSyncEventByPeer(myPeerId, payload);
   }, []);
 
+  const broadcastDuration = useCallback((duration: number) => {
+    const myPeerId = useWebRTCStore.getState().peerId;
+    useWebRTCStore.getState().setDurationByPeer(myPeerId, duration);
+    broadcastDataMessage({ type: "duration", payload: { duration } });
+  }, []);
+
   const sendSyncRequest = useCallback((targetPeerId: string, action: "play" | "pause" | "seek", time: number) => {
     const payload = { action, time, timestamp: Date.now() };
     sendDataMessageToPeer(targetPeerId, { type: "sync_request", payload });
@@ -626,6 +698,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     broadcastStream,
     broadcastStreamMode,
     broadcastSyncEvent,
+    broadcastDuration,
     sendSyncRequest,
     broadcastChatMessage,
   }), [
@@ -634,6 +707,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     broadcastStream,
     broadcastStreamMode,
     broadcastSyncEvent,
+    broadcastDuration,
     sendSyncRequest,
     broadcastChatMessage,
   ]);
