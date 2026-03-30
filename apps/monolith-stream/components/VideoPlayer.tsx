@@ -620,7 +620,8 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
         <video
           ref={localVideoRef}
           src={localVideoUrl}
-          className="w-px h-px opacity-0 absolute pointer-events-none"
+          style={{ position: "fixed", top: "-9999px", width: "1920px", height: "1080px", opacity: 0.01 }}
+          className="pointer-events-none"
           muted
           onPlay={handlePlay}
           onPause={handlePause}

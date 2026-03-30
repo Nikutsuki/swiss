@@ -243,36 +243,39 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     const kbps = Math.max(1, Math.floor(targetKbps));
     const tiasBps = kbps * 1000;
 
-    const lines = sdp.split(/\r\n/);
+    const lines = sdp.split(/\r?\n/);
     let inVideo = false;
     let inserted = false;
+    const modifiedLines: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+      const line = lines[i].trim();
+      if (!line) continue;
 
       if (line.startsWith("m=")) {
         inVideo = line.startsWith("m=video");
         inserted = false;
+        modifiedLines.push(line);
         continue;
       }
 
-      if (!inVideo) continue;
-
-      // Remove existing bandwidth constraints for this m-section.
-      if (line.startsWith("b=AS:") || line.startsWith("b=TIAS:")) {
-        lines[i] = "";
-        continue;
+      if (inVideo) {
+        if (line.startsWith("b=AS:") || line.startsWith("b=TIAS:")) {
+          continue;
+        }
       }
 
-      // Insert bandwidth constraints just after the connection line.
-      if (!inserted && line.startsWith("c=")) {
-        lines.splice(i + 1, 0, `b=AS:${kbps}`, `b=TIAS:${tiasBps}`);
+      modifiedLines.push(line);
+
+      if (inVideo && !inserted && line.startsWith("c=")) {
+        modifiedLines.push(`b=AS:${kbps}`);
+        modifiedLines.push(`b=TIAS:${tiasBps}`);
         inserted = true;
-        i += 2;
       }
     }
 
-    return lines.filter((l) => l !== "").join("\r\n");
+    // SDP requires a trailing \r\n.
+    return modifiedLines.join("\r\n") + "\r\n";
   };
 
   const createPeerConnection = (targetPeerId: string, polite: boolean) => {
@@ -412,15 +415,19 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
         if (!pc) {
           pc = createPeerConnection(peer_id, true);
         }
+        // Munge the INCOMING offer to authorize high bandwidth locally.
+        const parsedSdp = JSON.parse(sdp);
+        const targetKbps = (activeQualityRef.current?.bitrateMbps ?? 15) * 1000;
+        if (parsedSdp?.sdp) parsedSdp.sdp = enforceSdpBitrate(parsedSdp.sdp, targetKbps);
+
         // 1. Process the incoming offer (creates the video transceiver)
-        await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sdp)));
+        await pc.setRemoteDescription(new RTCSessionDescription(parsedSdp));
 
         // 2. Enforce preferences on the newly created transceiver
         enforceCodecPreferences(pc);
 
         // 3. Generate the answer matching the enforced preferences
         const answer = await pc.createAnswer();
-        const targetKbps = (activeQualityRef.current?.bitrateMbps ?? 8) * 1000;
         if (answer.sdp) answer.sdp = enforceSdpBitrate(answer.sdp, targetKbps);
         await pc.setLocalDescription(answer);
         wsRef.current?.send(JSON.stringify({
