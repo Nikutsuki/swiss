@@ -242,35 +242,36 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
   const enforceSdpBitrate = (sdp: string, targetKbps: number) => {
     const kbps = Math.max(1, Math.floor(targetKbps));
     const tiasBps = kbps * 1000;
+    const startKbps = Math.floor(kbps * 0.8);
 
     const lines = sdp.split(/\r?\n/);
     let inVideo = false;
-    let inserted = false;
     const modifiedLines: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+      let line = lines[i].trim();
       if (!line) continue;
 
       if (line.startsWith("m=")) {
         inVideo = line.startsWith("m=video");
-        inserted = false;
-        modifiedLines.push(line);
-        continue;
       }
 
       if (inVideo) {
         if (line.startsWith("b=AS:") || line.startsWith("b=TIAS:")) {
           continue;
         }
+
+        // Push Google bitrate hints directly on codec fmtp attributes.
+        if (line.startsWith("a=fmtp:")) {
+          line += `;x-google-start-bitrate=${startKbps};x-google-min-bitrate=${startKbps};x-google-max-bitrate=${kbps}`;
+        }
       }
 
       modifiedLines.push(line);
 
-      if (inVideo && !inserted && line.startsWith("c=")) {
+      if (inVideo && line.startsWith("c=")) {
         modifiedLines.push(`b=AS:${kbps}`);
         modifiedLines.push(`b=TIAS:${tiasBps}`);
-        inserted = true;
       }
     }
 
@@ -596,8 +597,8 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     const videoTrack = stream?.getVideoTracks()[0] || null;
     const audioTrack = stream?.getAudioTracks()[0] || null;
 
-    // Hint to the encoder to prioritize detail for screen shares.
-    if (videoTrack && mode === "screen") {
+    // Hint to the encoder to prioritize detail for both screen and file shares.
+    if (videoTrack && (mode === "screen" || mode === "file")) {
       // Not all browsers have this typed on MediaStreamTrack; keep it safe.
       (videoTrack as unknown as { contentHint?: string }).contentHint = "detail";
     }
@@ -622,11 +623,11 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
               params.encodings = [{}];
             }
 
-            params.encodings[0].maxBitrate = Math.max(
-              1_000_000,
-              Math.floor(quality.bitrateMbps * 1_000_000),
-            );
+            params.encodings[0].maxBitrate = Math.floor(quality.bitrateMbps * 1_000_000);
             params.encodings[0].maxFramerate = quality.fps;
+            // DOM typings are inconsistent across browsers; set as extended fields.
+            (params.encodings[0] as any).networkPriority = "high";
+            (params.encodings[0] as any).priority = "high";
             params.degradationPreference = "maintain-resolution";
 
             await sender.setParameters(params);
