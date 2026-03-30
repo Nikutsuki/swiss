@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useWebRTCStore, useWebRTC } from "@/hooks/useWebRTC";
 import { Card } from "@swiss/ui";
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Tv } from "lucide-react";
@@ -43,7 +43,7 @@ function FloatingVideoWrapper({
     >
       <div className="w-full h-full relative">
         <div
-          className="drag-handle absolute top-0 left-0 right-0 h-10 z-50 cursor-grab active:cursor-grabbing opacity-0 group-hover/rnd:opacity-100 bg-gradient-to-b from-black/80 to-transparent transition-opacity flex items-start justify-center pt-2"
+          className="drag-handle absolute top-0 left-0 right-0 h-10 z-50 cursor-grab active:cursor-grabbing opacity-0 group-hover/rnd:opacity-100 bg-linear-to-b from-black/80 to-transparent transition-opacity flex items-start justify-center pt-2"
           title="Drag to move"
         >
           <div className="w-12 h-1.5 bg-white/50 rounded-full" />
@@ -147,7 +147,7 @@ function CustomControls({
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 pt-8 flex items-center gap-3 opacity-0 hover:opacity-100 transition-opacity focus-within:opacity-100 pointer-events-auto">
+    <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/90 to-transparent p-3 pt-8 flex items-center gap-3 opacity-0 hover:opacity-100 transition-opacity focus-within:opacity-100 pointer-events-auto">
       {!isLiveStream && duration !== undefined && (
         <>
           <button onClick={handlePlayToggle} className="text-white hover:text-[#52c488] transition-colors" type="button">
@@ -208,40 +208,58 @@ function CustomControls({
 }
 
 interface VideoViewProps {
-  stream: MediaStream | null;
+  stream?: MediaStream | null;
+  videoUrl?: string | null;
   label: string;
   muted?: boolean;
-  controls?: boolean; // Native browser controls
   duration?: number;
-  syncEvent?: { action: string; time: number; timestamp: number };
-  isRemoteStream?: boolean;
-  isRemoteFile?: boolean;
+  syncEvent?: any;
   isLiveStream?: boolean;
   isLocal?: boolean;
-  onPlay?: (time: number) => void;
-  onPause?: (time: number) => void;
-  onSeeked?: (time: number) => void;
+  // Native DOM events (Streamer uses these to trigger network broadcasts)
+  onPlayNative?: (time: number) => void;
+  onPauseNative?: (time: number) => void;
+  onSeekedNative?: (time: number) => void;
+  onLoadedMetadataNative?: () => void;
+  // Network Requests (Viewers use these to ask the streamer to sync)
+  remotePlayRequest?: (time: number) => void;
+  remotePauseRequest?: (time: number) => void;
+  remoteSeekRequest?: (time: number) => void;
   setVideoElementRef?: (el: HTMLVideoElement | null) => void;
 }
 
 function VideoView({
   stream,
+  videoUrl,
   label,
   muted = false,
-  controls = false,
   duration,
   syncEvent,
-  isRemoteStream = false,
-  isRemoteFile = false,
   isLiveStream = false,
   isLocal = false,
-  onPlay,
-  onPause,
-  onSeeked,
+  onPlayNative,
+  onPauseNative,
+  onSeekedNative,
+  onLoadedMetadataNative,
+  remotePlayRequest,
+  remotePauseRequest,
+  remoteSeekRequest,
   setVideoElementRef,
 }: VideoViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Maintain stable DOM ref callback to avoid ref teardown/setup loops.
+  const externalRef = useRef(setVideoElementRef);
+  externalRef.current = setVideoElementRef;
+
+  const handleVideoRef = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (externalRef.current) {
+      externalRef.current(el);
+    }
+  }, []);
+
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isLocalMuted, setIsLocalMuted] = useState(muted);
@@ -269,61 +287,60 @@ function VideoView({
     }
   }, [volume, isLocalMuted]);
 
+  // Handle Stream vs File Source
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !stream) return;
+    if (!video) return;
 
-    video.srcObject = stream;
-
-    if (!isRemoteFile) {
-      video.play().catch((err: unknown) => {
-        if (err instanceof Error && err.name === "NotAllowedError") {
-          setAutoplayBlocked(true);
-        }
+    if (stream) {
+      video.srcObject = stream;
+      video.src = "";
+      // Force streams to continuously consume frames. Headless player handles pausing.
+      video.play().catch((err: any) => {
+        if (err?.name === "NotAllowedError") setAutoplayBlocked(true);
       });
+    } else if (videoUrl) {
+      video.srcObject = null;
+      video.src = videoUrl;
     }
-  }, [stream, isRemoteFile]);
+  }, [stream, videoUrl]);
 
-  // Network Sync Loop & Remount Recovery
+  // Network Sync Loop (Executes ONLY for remote viewers watching a file)
   useEffect(() => {
     const videoEl = videoRef.current;
-    if (!videoEl || !syncEvent || isLiveStream) return;
+    if (!videoEl || !syncEvent || isLiveStream || isLocal) return;
 
-    let targetTime = syncEvent.time;
-    if (syncEvent.action === "play") {
-      const elapsed = (Date.now() - syncEvent.timestamp) / 1000;
-      targetTime += Math.max(0, elapsed);
-    }
-
-    if (isLocal) {
-      if (videoEl.currentTime < 1 && targetTime > 1) {
-        videoEl.currentTime = targetTime;
-        if (syncEvent.action === "play") {
-          videoEl.play().catch(() => undefined);
-        }
-      }
-      return;
-    }
-
-    if (Math.abs(videoEl.currentTime - targetTime) > 1) {
-      videoEl.currentTime = targetTime;
+    // Only apply currentTime to raw file URLs, never to MediaStreams
+    if (!stream && videoUrl && Math.abs(videoEl.currentTime - syncEvent.time) > 1) {
+      videoEl.currentTime = syncEvent.time;
     }
 
     if (syncEvent.action === "play" && videoEl.paused) {
-      videoEl
-        .play()
-        .then(() => setAutoplayBlocked(false))
-        .catch((err: unknown) => {
-          if (err instanceof Error && err.name === "NotAllowedError") {
-            setAutoplayBlocked(true);
-          }
-        });
+      videoEl.play().then(() => setAutoplayBlocked(false)).catch((err: any) => {
+        if (err?.name === "NotAllowedError") setAutoplayBlocked(true);
+      });
     } else if (syncEvent.action === "pause" && !videoEl.paused) {
       videoEl.pause();
     }
-  }, [syncEvent, isLiveStream, isLocal]);
+  }, [syncEvent, isLiveStream, isLocal, stream, videoUrl]);
 
-  if (!stream) return null;
+  // UI Interceptors (Routes UI clicks to local DOM or network based on role)
+  const handleUiPlay = (t: number) => {
+    if (!isLocal && remotePlayRequest) remotePlayRequest(t);
+    else if (isLocal && onPlayNative) onPlayNative(t);
+  };
+
+  const handleUiPause = (t: number) => {
+    if (!isLocal && remotePauseRequest) remotePauseRequest(t);
+    else if (isLocal && onPauseNative) onPauseNative(t);
+  };
+
+  const handleUiSeek = (t: number) => {
+    if (!isLocal && remoteSeekRequest) remoteSeekRequest(t);
+    else if (isLocal && onSeekedNative) onSeekedNative(t);
+  };
+
+  if (!stream && !videoUrl) return null;
 
   return (
     <div
@@ -331,15 +348,12 @@ function VideoView({
       className={`relative bg-black overflow-hidden group ${isFullscreen ? "fixed inset-0 z-50 rounded-none w-screen h-screen flex items-center justify-center" : "rounded-lg border border-[#444] aspect-video w-full h-full"}`}
     >
       <video
-        ref={(el) => {
-          videoRef.current = el;
-          setVideoElementRef?.(el);
-        }}
-        autoPlay={!isRemoteFile}
+        ref={handleVideoRef}
+        autoPlay={isLiveStream}
         playsInline
         muted={isLocalMuted}
-        className={`w-full h-full object-contain ${isRemoteStream ? "pointer-events-none" : ""}`}
-        controls={controls && !isRemoteStream}
+        onLoadedMetadata={isLocal ? onLoadedMetadataNative : undefined}
+        className={`w-full h-full object-contain ${!isLocal ? "pointer-events-none" : ""}`}
       />
       {!isFullscreen && (
         <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
@@ -364,24 +378,22 @@ function VideoView({
           </button>
         </div>
       )}
-      {isRemoteStream && (
-        <CustomControls
-          isLiveStream={!isRemoteFile}
-          duration={duration}
-          syncEvent={syncEvent}
-          volume={volume}
-          isMuted={isLocalMuted}
-          isFullscreen={isFullscreen}
-          theaterMode={theaterMode}
-          onVolumeChange={setVolume}
-          onMuteToggle={() => setIsLocalMuted(!isLocalMuted)}
-          onFullscreenToggle={toggleFullscreen}
-          onTheaterToggle={toggleTheaterMode}
-          onPlay={isRemoteFile ? (t) => onPlay?.(t) : undefined}
-          onPause={isRemoteFile ? (t) => onPause?.(t) : undefined}
-          onSeek={isRemoteFile ? (t) => onSeeked?.(t) : undefined}
-        />
-      )}
+      <CustomControls 
+        isLiveStream={isLiveStream}
+        duration={duration}
+        syncEvent={syncEvent}
+        volume={volume}
+        isMuted={isLocalMuted}
+        isFullscreen={isFullscreen}
+        theaterMode={theaterMode}
+        onVolumeChange={setVolume}
+        onMuteToggle={() => setIsLocalMuted(!isLocalMuted)}
+        onFullscreenToggle={toggleFullscreen}
+        onTheaterToggle={toggleTheaterMode}
+        onPlay={!isLiveStream ? handleUiPlay : undefined}
+        onPause={!isLiveStream ? handleUiPause : undefined}
+        onSeek={!isLiveStream ? handleUiSeek : undefined}
+      />
     </div>
   );
 }
@@ -410,9 +422,12 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
   const { broadcastSyncEvent, broadcastStream, broadcastStreamMode, sendSyncRequest, broadcastDuration } = useWebRTC();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+  const isFlushingRef = useRef(false);
   
   const remotePeers = Object.keys(remoteStreams);
   const { theaterMode } = useWebRTCStore();
+
+  const [capturedFileStream, setCapturedFileStream] = useState<MediaStream | null>(null);
   
   // Let peers know this peer is the active file streamer as soon as we have a file URL,
   // even before the capture stream is fully ready.
@@ -421,39 +436,97 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
     broadcastStreamMode("file");
   }, [localVideoUrl, broadcastStreamMode]);
 
-  // Handle file stream capturing and broadcasting
   useEffect(() => {
-    if (localVideoUrl && localVideoRef.current) {
-      const video = localVideoRef.current as ExtendedHTMLVideoElement;
-      
-      const setupCapture = () => {
-        try {
-          const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream ? video.mozCaptureStream() : null;
-          if (stream) {
-            // Pass only the scalar quality fields so React Hook deps stay accurate.
-            broadcastStream(stream, "file", {
-              resolution: quality.resolution,
-              fps: quality.fps,
-              bitrateMbps: quality.bitrateMbps,
-            });
-          }
-        } catch (err) {
-          console.error("Failed to capture video stream", err);
-        }
-      };
+    if (!localVideoUrl) {
+      setCapturedFileStream(null);
+    }
+  }, [localVideoUrl]);
 
-      // We need enough data to be loaded to capture a stream
-      if (video.readyState >= 3) {
-        setupCapture();
-      } else {
-        const handleCanPlay = () => {
-          setupCapture();
-          video.removeEventListener('canplay', handleCanPlay);
-        };
-        video.addEventListener('canplay', handleCanPlay);
+  useEffect(() => {
+    const video = localVideoRef.current as ExtendedHTMLVideoElement | null;
+    if (!localVideoUrl || !video) return;
+
+    // 1. RESTORE TIME ON REMOUNT (Fixes the 0:00 Theater Mode Reset)
+    const state = useWebRTCStore.getState();
+    const lastSync = state.syncEventsByPeer[state.peerId];
+
+    if (lastSync) {
+      let targetTime = lastSync.time;
+      if (lastSync.action === "play") {
+        const elapsed = (Date.now() - lastSync.timestamp) / 1000;
+        targetTime += Math.max(0, elapsed);
+      }
+      if (Math.abs(video.currentTime - targetTime) > 0.5) {
+        video.currentTime = targetTime;
+        if (lastSync.action === "play") {
+          video.play().catch(() => undefined);
+        }
       }
     }
-  }, [localVideoUrl, broadcastStream, quality.bitrateMbps, quality.fps, quality.resolution]);
+
+    // 2. Initialize Capture
+    const initCapture = () => {
+      try {
+        const stream =
+          video.captureStream ? video.captureStream() : video.mozCaptureStream ? video.mozCaptureStream() : null;
+        if (stream) {
+          setCapturedFileStream(stream);
+          broadcastStream(stream, "file", {
+            resolution: quality.resolution,
+            fps: quality.fps,
+            bitrateMbps: quality.bitrateMbps,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to capture video stream", err);
+      }
+    };
+
+    if (video.readyState >= 3) initCapture();
+    else {
+      const onCanPlay = () => {
+        initCapture();
+        video.removeEventListener("canplay", onCanPlay);
+      };
+      video.addEventListener("canplay", onCanPlay);
+    }
+  }, [localVideoUrl, broadcastStream, quality.resolution, quality.fps, quality.bitrateMbps]);
+
+  const handleLocalUiPlay = (t: number) => {
+    const video = localVideoRef.current;
+    if (video) {
+      if (Math.abs(video.currentTime - t) > 0.5) video.currentTime = t;
+      video.play().catch(() => undefined);
+    }
+  };
+
+  const handleLocalUiPause = (_t: number) => {
+    localVideoRef.current?.pause();
+  };
+
+  const handleLocalUiSeek = async (t: number) => {
+    const video = localVideoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      // Chromium workaround: flush a frame for captureStream on paused seek.
+      isFlushingRef.current = true;
+      video.currentTime = t;
+      try {
+        await new Promise((resolve) => {
+          video.addEventListener("seeked", () => resolve(undefined), { once: true });
+        });
+        await video.play();
+        video.pause();
+      } catch (_e) {
+        // noop
+      }
+      isFlushingRef.current = false;
+      broadcastSyncEvent("seek", t);
+    } else {
+      video.currentTime = t;
+    }
+  };
 
   const localSuppressRef = useRef(false);
 
@@ -489,18 +562,26 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
   }, [incomingSyncRequest, peerId, streamModesByPeer, broadcastSyncEvent, setIncomingSyncRequest]);
 
   const handlePlay = () => {
-    if (!localVideoRef.current || localSuppressRef.current) return;
+    if (isFlushingRef.current || !localVideoRef.current || localSuppressRef.current) return;
     broadcastSyncEvent("play", localVideoRef.current.currentTime);
   };
 
   const handlePause = () => {
-    if (!localVideoRef.current || localSuppressRef.current) return;
+    if (isFlushingRef.current || !localVideoRef.current || localSuppressRef.current) return;
     broadcastSyncEvent("pause", localVideoRef.current.currentTime);
   };
 
   const handleSeeked = () => {
-    if (!localVideoRef.current || localSuppressRef.current) return;
-    broadcastSyncEvent("seek", localVideoRef.current.currentTime);
+    if (isFlushingRef.current || !localVideoRef.current || localSuppressRef.current) return;
+    const video = localVideoRef.current;
+
+    // If the engine is still playing after a seek, force a 'play' broadcast so
+    // remote peers resume playback (seeked doesn't always re-fire play()).
+    if (!video.paused) {
+      broadcastSyncEvent("play", video.currentTime);
+    } else {
+      broadcastSyncEvent("seek", video.currentTime);
+    }
   };
 
   const handleLoadedMetadata = () => {
@@ -532,113 +613,118 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
     );
   }
 
-  if (!theaterMode) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {localStream && <VideoView stream={localStream} label="You (Screen)" muted />}
-
-        {localVideoUrl && (
-          <div className="relative bg-black rounded-lg overflow-hidden border border-(--outline-variant)/40 aspect-video">
-            <video
-              ref={localVideoRef}
-              src={localVideoUrl}
-              controls
-              onLoadedMetadata={handleLoadedMetadata}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onSeeked={handleSeeked}
-              className="w-full h-full object-contain"
-            />
-            <div className="absolute top-2 right-2 bg-[#52c488]/90 text-black px-2 py-1 rounded text-xs font-medium z-10">
-              Syncing enabled
-            </div>
-            <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
-              You (File)
-            </div>
-          </div>
-        )}
-
-        {remotePeers.map((peerId) => {
-          const isFileMode = streamModesByPeer[peerId] === "file";
-          return (
-            <VideoView
-              key={peerId}
-              stream={remoteStreams[peerId]}
-              label={`Peer ${peerId.substring(0, 5)}`}
-              isRemoteStream={true}
-              isRemoteFile={isFileMode}
-              isLiveStream={!isFileMode}
-              duration={durationsByPeer[peerId]}
-              syncEvent={syncEventsByPeer[peerId]}
-              onPlay={isFileMode ? (time) => handleRemotePlay(peerId, time) : undefined}
-              onPause={isFileMode ? (time) => handleRemotePause(peerId, time) : undefined}
-              onSeeked={isFileMode ? (time) => handleRemoteSeeked(peerId, time) : undefined}
-              setVideoElementRef={(el) => {
-                remoteVideoRefs.current[peerId] = el;
-              }}
-            />
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
-    <div className="relative w-full h-full min-h-[600px] bg-black/50 rounded-lg overflow-hidden border border-[#333]">
-      <div className="absolute inset-0 flex items-center justify-center text-white/20 pointer-events-none">
-        <span className="font-mono text-sm">Theater Canvas Active</span>
-      </div>
-
-      {localStream && (
-        <FloatingVideoWrapper defaultX={20} defaultY={20} zIndex={40}>
-          <VideoView stream={localStream} label="You (Screen)" muted />
-        </FloatingVideoWrapper>
-      )}
-
+    <>
+      {/* THE HEADLESS PLAYER (Never unmounts, powers the entire system) */}
       {localVideoUrl && (
-        <FloatingVideoWrapper defaultX={40} defaultY={40} zIndex={41}>
-          <div className="w-full h-full bg-black relative">
-            <video
-              ref={localVideoRef}
-              src={localVideoUrl}
-              controls
-              onLoadedMetadata={handleLoadedMetadata}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onSeeked={handleSeeked}
-              className="w-full h-full object-contain"
-            />
-            <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10 pointer-events-none">
-              You (File)
-            </div>
-          </div>
-        </FloatingVideoWrapper>
+        <video
+          ref={localVideoRef}
+          src={localVideoUrl}
+          className="w-px h-px opacity-0 absolute pointer-events-none"
+          muted
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onSeeked={handleSeeked}
+          onLoadedMetadata={handleLoadedMetadata}
+        />
       )}
 
-      {remotePeers.map((peerId, index) => {
-        const isFileMode = streamModesByPeer[peerId] === "file";
-        const offset = (index + 2) * 20;
+      {!theaterMode && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {localStream && (
+            <VideoView stream={localStream} label="You (Screen)" muted={true} isLiveStream={true} isLocal={true} />
+          )}
 
-        return (
-          <FloatingVideoWrapper key={peerId} defaultX={offset} defaultY={offset} zIndex={50 + index}>
+          {localVideoUrl && capturedFileStream && (
             <VideoView
-              stream={remoteStreams[peerId]}
-              label={`Peer ${peerId.substring(0, 5)}`}
-              isRemoteStream={true}
-              isRemoteFile={isFileMode}
-              isLiveStream={!isFileMode}
+              stream={capturedFileStream}
+              label="You (File)"
+              isLiveStream={false}
+              isLocal={true}
               duration={durationsByPeer[peerId]}
               syncEvent={syncEventsByPeer[peerId]}
-              onPlay={isFileMode ? (time) => handleRemotePlay(peerId, time) : undefined}
-              onPause={isFileMode ? (time) => handleRemotePause(peerId, time) : undefined}
-              onSeeked={isFileMode ? (time) => handleRemoteSeeked(peerId, time) : undefined}
-              setVideoElementRef={(el) => {
-                remoteVideoRefs.current[peerId] = el;
-              }}
+              onPlayNative={handleLocalUiPlay}
+              onPauseNative={handleLocalUiPause}
+              onSeekedNative={handleLocalUiSeek}
             />
-          </FloatingVideoWrapper>
-        );
-      })}
-    </div>
+          )}
+
+          {remotePeers.map((peerId) => {
+            const isFileMode = streamModesByPeer[peerId] === "file";
+            return (
+              <VideoView
+                key={peerId}
+                stream={remoteStreams[peerId]}
+                label={`Peer ${peerId.substring(0, 5)}`}
+                isLiveStream={!isFileMode}
+                isLocal={false}
+                duration={durationsByPeer[peerId]}
+                syncEvent={syncEventsByPeer[peerId]}
+                remotePlayRequest={(time: number) => handleRemotePlay(peerId, time)}
+                remotePauseRequest={(time: number) => handleRemotePause(peerId, time)}
+                remoteSeekRequest={(time: number) => handleRemoteSeeked(peerId, time)}
+                setVideoElementRef={(el) => {
+                  remoteVideoRefs.current[peerId] = el;
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {theaterMode && (
+        <div className="relative w-full h-full min-h-[600px] bg-black/50 rounded-lg overflow-hidden border border-[#333]">
+          <div className="absolute inset-0 flex items-center justify-center text-white/20 pointer-events-none">
+            <span className="font-mono text-sm">Theater Canvas Active</span>
+          </div>
+
+          {localStream && (
+            <FloatingVideoWrapper defaultX={20} defaultY={20} zIndex={40}>
+              <VideoView stream={localStream} label="You (Screen)" muted={true} isLiveStream={true} isLocal={true} />
+            </FloatingVideoWrapper>
+          )}
+
+          {localVideoUrl && capturedFileStream && (
+            <FloatingVideoWrapper defaultX={40} defaultY={40} zIndex={41}>
+              <VideoView
+                stream={capturedFileStream}
+                label="You (File)"
+                isLiveStream={false}
+                isLocal={true}
+                duration={durationsByPeer[peerId]}
+                syncEvent={syncEventsByPeer[peerId]}
+                onPlayNative={handleLocalUiPlay}
+                onPauseNative={handleLocalUiPause}
+                onSeekedNative={handleLocalUiSeek}
+              />
+            </FloatingVideoWrapper>
+          )}
+
+          {remotePeers.map((peerId, index) => {
+            const isFileMode = streamModesByPeer[peerId] === "file";
+            const offset = (index + 2) * 20;
+
+            return (
+              <FloatingVideoWrapper key={peerId} defaultX={offset} defaultY={offset} zIndex={50 + index}>
+                <VideoView
+                  stream={remoteStreams[peerId]}
+                  label={`Peer ${peerId.substring(0, 5)}`}
+                  isLiveStream={!isFileMode}
+                  isLocal={false}
+                  duration={durationsByPeer[peerId]}
+                  syncEvent={syncEventsByPeer[peerId]}
+                  remotePlayRequest={(time: number) => handleRemotePlay(peerId, time)}
+                  remotePauseRequest={(time: number) => handleRemotePause(peerId, time)}
+                  remoteSeekRequest={(time: number) => handleRemoteSeeked(peerId, time)}
+                  setVideoElementRef={(el) => {
+                    remoteVideoRefs.current[peerId] = el;
+                  }}
+                />
+              </FloatingVideoWrapper>
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 }
