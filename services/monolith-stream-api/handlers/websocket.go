@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/nikut/swiss/services/monolith-stream-api/models"
+	"github.com/Nikutsuki/swiss/services/monolith-stream-api/models"
 )
 
 const (
@@ -43,7 +43,7 @@ func (h *Hub) Run() {
 }
 
 func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
-	// Extract lobby ID from URL: /stream/v1/lobby/{lobby_id}
+	// Extract lobby ID from URL: /v1/stream/ws/{lobby_id}
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 5 {
 		http.Error(w, "Invalid lobby ID", http.StatusBadRequest)
@@ -113,20 +113,17 @@ func writePump(client *models.Participant) {
 				return
 			}
 
-			w, err := client.WebSocketConn.NextWriter(websocket.TextMessage)
-			if err != nil {
+			if err := client.WebSocketConn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
-			w.Write(message)
 
-			// Add queued chat messages to the current websocket message.
+			// Add queued messages as separate websocket messages.
 			n := len(client.Send)
 			for i := 0; i < n; i++ {
-				w.Write(<-client.Send)
-			}
-
-			if err := w.Close(); err != nil {
-				return
+				client.WebSocketConn.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := client.WebSocketConn.WriteMessage(websocket.TextMessage, <-client.Send); err != nil {
+					return
+				}
 			}
 		case <-ticker.C:
 			client.WebSocketConn.SetWriteDeadline(time.Now().Add(writeWait))

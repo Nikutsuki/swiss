@@ -10,3 +10,30 @@
 export interface HealthResponse {
   ok: boolean;
 }
+
+//////////
+// source: lobby.go
+
+export interface Lobby {
+  ID: string;
+  HostID: string;
+  Participants: { [key: string]: Participant | undefined};
+  CreatedAt: string;
+}
+export interface Participant {
+  ID: string;
+  LobbyID: string;
+  WebSocketConn?: any /* websocket.Conn */;
+  JoinedAt: string;
+  Send: any;
+}
+export interface Message {
+  type: string;
+  target_peer_id?: string;
+  payload: MessagePayload;
+}
+export interface MessagePayload {
+  peer_id?: string;
+  sdp?: string;
+  candidate?: string;
+}
