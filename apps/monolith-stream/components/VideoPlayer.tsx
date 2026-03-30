@@ -5,6 +5,7 @@ import { useWebRTCStore, useWebRTC } from "@/hooks/useWebRTC";
 import { Card } from "@swiss/ui";
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Tv } from "lucide-react";
 import type { StreamQuality } from "@/components/StreamControls";
+import { Rnd } from "react-rnd";
 
 const formatTime = (seconds: number) => {
   if (!seconds || Number.isNaN(seconds)) return "0:00";
@@ -12,6 +13,47 @@ const formatTime = (seconds: number) => {
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
+
+function FloatingVideoWrapper({
+  children,
+  defaultX,
+  defaultY,
+  zIndex,
+}: {
+  children: React.ReactNode;
+  defaultX: number;
+  defaultY: number;
+  zIndex: number;
+}) {
+  return (
+    <Rnd
+      default={{
+        x: defaultX,
+        y: defaultY,
+        width: 320,
+        height: 180,
+      }}
+      bounds="parent"
+      lockAspectRatio={16 / 9}
+      minWidth={200}
+      maxWidth="100%"
+      className="group/rnd absolute shadow-2xl shadow-black/50 rounded-lg overflow-hidden border border-white/10"
+      style={{ zIndex }}
+      dragHandleClassName="drag-handle"
+    >
+      <div className="w-full h-full relative">
+        <div
+          className="drag-handle absolute top-0 left-0 right-0 h-10 z-50 cursor-grab active:cursor-grabbing opacity-0 group-hover/rnd:opacity-100 bg-gradient-to-b from-black/80 to-transparent transition-opacity flex items-start justify-center pt-2"
+          title="Drag to move"
+        >
+          <div className="w-12 h-1.5 bg-white/50 rounded-full" />
+        </div>
+
+        {children}
+      </div>
+    </Rnd>
+  );
+}
 
 interface CustomControlsProps {
   isLiveStream: boolean;
@@ -115,7 +157,7 @@ function CustomControls({
             onPointerDown={() => (isScrubbingRef.current = true)}
             onChange={(e) => setLocalTime(Number(e.target.value))}
             onPointerUp={handleScrubEnd}
-            className="flex-1 accent-[#52c488] h-1.5 cursor-pointer bg-white/30 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-[#52c488] [&::-webkit-slider-thumb]:rounded-full"
+            className="flex-1 accent-[#52c488] h-1.5 cursor-pointer bg-white/30 rounded-full min-w-0 appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-[#52c488] [&::-webkit-slider-thumb]:rounded-full"
           />
           <span className="text-white text-xs font-mono">{formatTime(duration)}</span>
         </>
@@ -343,6 +385,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
   const remoteVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   
   const remotePeers = Object.keys(remoteStreams);
+  const { theaterMode } = useWebRTCStore();
   
   // Let peers know this peer is the active file streamer as soon as we have a file URL,
   // even before the capture stream is fully ready.
@@ -462,50 +505,109 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
     );
   }
 
+  if (!theaterMode) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {localStream && <VideoView stream={localStream} label="You (Screen)" muted />}
+
+        {localVideoUrl && (
+          <div className="relative bg-black rounded-lg overflow-hidden border border-(--outline-variant)/40 aspect-video">
+            <video
+              ref={localVideoRef}
+              src={localVideoUrl}
+              controls
+              onLoadedMetadata={handleLoadedMetadata}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onSeeked={handleSeeked}
+              className="w-full h-full object-contain"
+            />
+            <div className="absolute top-2 right-2 bg-[#52c488]/90 text-black px-2 py-1 rounded text-xs font-medium z-10">
+              Syncing enabled
+            </div>
+            <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
+              You (File)
+            </div>
+          </div>
+        )}
+
+        {remotePeers.map((peerId) => {
+          const isFileMode = streamModesByPeer[peerId] === "file";
+          return (
+            <VideoView
+              key={peerId}
+              stream={remoteStreams[peerId]}
+              label={`Peer ${peerId.substring(0, 5)}`}
+              isRemoteStream={true}
+              isRemoteFile={isFileMode}
+              duration={durationsByPeer[peerId]}
+              syncEvent={syncEventsByPeer[peerId]}
+              onPlay={isFileMode ? (time) => handleRemotePlay(peerId, time) : undefined}
+              onPause={isFileMode ? (time) => handleRemotePause(peerId, time) : undefined}
+              onSeeked={isFileMode ? (time) => handleRemoteSeeked(peerId, time) : undefined}
+              setVideoElementRef={(el) => {
+                remoteVideoRefs.current[peerId] = el;
+              }}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {localStream && <VideoView stream={localStream} label="You (Screen)" muted />}
-      
-      {localVideoUrl && (
-        <div className="relative bg-black rounded-lg overflow-hidden border border-(--outline-variant)/40 aspect-video">
-          <video
-            ref={localVideoRef}
-            src={localVideoUrl}
-            controls
-            onLoadedMetadata={handleLoadedMetadata}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onSeeked={handleSeeked}
-            className="w-full h-full object-contain"
-          />
-          <div className="absolute top-2 right-2 bg-(--security-emerald)/90 text-black px-2 py-1 rounded text-xs font-medium">
-            Syncing enabled
-          </div>
-          <div className="absolute bottom-12 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white">
-            You (File)
-          </div>
-        </div>
+    <div className="relative w-full h-full min-h-[600px] bg-black/50 rounded-lg overflow-hidden border border-[#333]">
+      <div className="absolute inset-0 flex items-center justify-center text-white/20 pointer-events-none">
+        <span className="font-mono text-sm">Theater Canvas Active</span>
+      </div>
+
+      {localStream && (
+        <FloatingVideoWrapper defaultX={20} defaultY={20} zIndex={40}>
+          <VideoView stream={localStream} label="You (Screen)" muted />
+        </FloatingVideoWrapper>
       )}
 
-      {remotePeers.map((remotePeerId) => {
-        const isFileMode = streamModesByPeer[remotePeerId] === "file";
+      {localVideoUrl && (
+        <FloatingVideoWrapper defaultX={40} defaultY={40} zIndex={41}>
+          <div className="w-full h-full bg-black relative">
+            <video
+              ref={localVideoRef}
+              src={localVideoUrl}
+              controls
+              onLoadedMetadata={handleLoadedMetadata}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onSeeked={handleSeeked}
+              className="w-full h-full object-contain"
+            />
+            <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10 pointer-events-none">
+              You (File)
+            </div>
+          </div>
+        </FloatingVideoWrapper>
+      )}
+
+      {remotePeers.map((peerId, index) => {
+        const isFileMode = streamModesByPeer[peerId] === "file";
+        const offset = (index + 2) * 20;
+
         return (
-          <VideoView
-            key={remotePeerId}
-            stream={remoteStreams[remotePeerId]}
-            label={`Peer ${remotePeerId.substring(0, 5)}`}
-            isRemoteStream
-            controls={isFileMode}
-            isRemoteFile={isFileMode}
-            duration={durationsByPeer[remotePeerId]}
-            syncEvent={syncEventsByPeer[remotePeerId]}
-            onPlay={isFileMode ? (time) => handleRemotePlay(remotePeerId, time) : undefined}
-            onPause={isFileMode ? (time) => handleRemotePause(remotePeerId, time) : undefined}
-            onSeeked={isFileMode ? (time) => handleRemoteSeeked(remotePeerId, time) : undefined}
-            setVideoElementRef={(el) => {
-              remoteVideoRefs.current[remotePeerId] = el;
-            }}
-          />
+          <FloatingVideoWrapper key={peerId} defaultX={offset} defaultY={offset} zIndex={50 + index}>
+            <VideoView
+              stream={remoteStreams[peerId]}
+              label={`Peer ${peerId.substring(0, 5)}`}
+              isRemoteStream={true}
+              isRemoteFile={isFileMode}
+              duration={durationsByPeer[peerId]}
+              syncEvent={syncEventsByPeer[peerId]}
+              onPlay={isFileMode ? (time) => handleRemotePlay(peerId, time) : undefined}
+              onPause={isFileMode ? (time) => handleRemotePause(peerId, time) : undefined}
+              onSeeked={isFileMode ? (time) => handleRemoteSeeked(peerId, time) : undefined}
+              setVideoElementRef={(el) => {
+                remoteVideoRefs.current[peerId] = el;
+              }}
+            />
+          </FloatingVideoWrapper>
         );
       })}
     </div>
