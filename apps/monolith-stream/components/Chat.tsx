@@ -39,7 +39,7 @@ export function Chat() {
                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
               >
                 <div 
-                  className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
+                  className={`max-w-[90%] sm:max-w-[85%] px-3 py-2 rounded-lg text-sm wrap-break-word ${
                     isMe 
                       ? 'bg-(--security-emerald) text-black rounded-br-sm' 
                       : 'bg-(--surface-container-high) text-(--on-surface) rounded-bl-sm'
@@ -66,7 +66,7 @@ export function Chat() {
           placeholder="Type a message..."
           className="flex-1"
         />
-        <Button type="submit" variant="primary" disabled={!text.trim()} className="px-3">
+        <Button type="submit" variant="primary" disabled={!text.trim()} className="px-3 shrink-0">
           <Send className="w-4 h-4" />
         </Button>
       </form>

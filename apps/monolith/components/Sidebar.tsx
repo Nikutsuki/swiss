@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@swiss/ui";
 import {
@@ -45,11 +45,9 @@ type RecentSharedPaste = {
   expires_at?: string;
 };
 
-const SIDEBAR_EXPANDED_W = "clamp(14rem, 12.5vw, 20rem)";
-const SIDEBAR_COLLAPSED_W = "4.25rem";
-
 export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [recentShared, setRecentShared] = useState<RecentSharedPaste[]>([]);
 
   useEffect(() => {
@@ -92,11 +90,28 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
 
   return (
     <aside
-      style={{ width: collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_EXPANDED_W }}
-      className="flex h-full shrink-0 flex-col overflow-hidden border-r border-white/5 bg-(--surface-container-low) pt-5 transition-[width] duration-420 ease-[cubic-bezier(0.33,1,0.68,1)] motion-reduce:transition-none"
+      className={`flex h-auto lg:h-full w-full shrink-0 flex-col overflow-hidden border-b lg:border-b-0 lg:border-r border-white/5 bg-(--surface-container-low) pt-2 lg:pt-5 transition-[width] duration-420 ease-[cubic-bezier(0.33,1,0.68,1)] motion-reduce:transition-none ${collapsed ? "lg:w-17" : "lg:w-[clamp(14rem,12.5vw,20rem)]"}`}
     >
+      <div className="px-3 pb-2 lg:hidden">
+        <label className="mb-1 block text-[10px] tracking-widest text-(--on-surface-variant) uppercase">
+          Navigate
+        </label>
+        <select
+          value={items.find((item) => (item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`)))?.href ?? "/"}
+          onChange={(e) => router.push(e.target.value)}
+          className="w-full rounded-xs border border-white/10 bg-(--surface-container-high) px-3 py-2 text-sm text-(--on-surface)"
+          aria-label="Navigate sections"
+        >
+          {items.map((item) => (
+            <option key={item.href} value={item.href}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div
-        className={`overflow-hidden px-4 pb-4 transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${collapsed
+        className={`hidden lg:block overflow-hidden px-4 pb-4 transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${collapsed
           ? "pointer-events-none max-h-0 -translate-y-1 opacity-0"
           : "max-h-40 translate-y-0 opacity-100"
           }`}
@@ -106,7 +121,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
       </div>
 
       <nav
-        className="flex min-h-0 flex-col overflow-y-auto overflow-x-hidden pb-2"
+        className="hidden lg:flex min-h-0 flex-col overflow-y-auto overflow-x-hidden pb-2"
         aria-label="Archive sections"
       >
         {items.map(({ href, label, icon }) => {
@@ -122,7 +137,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               size="md"
               bold={active}
               className={`${navLinkClass} ${active ? "" : "text-(--on-surface) hover:bg-white/5"
-                } rounded-none ${collapsed ? "justify-center px-2" : "justify-start gap-3"
+                } rounded-none shrink-0 ${collapsed ? "justify-center px-2" : "justify-start gap-3"
                 }`}
             >
               <Link href={href} title={collapsed ? label : undefined}>
@@ -142,7 +157,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
       </nav>
 
       <div
-        className={`px-4 pb-2 transition-[opacity,transform,max-height] duration-300 ease-out motion-reduce:transition-none ${collapsed
+        className={`hidden lg:block px-4 pb-2 transition-[opacity,transform,max-height] duration-300 ease-out motion-reduce:transition-none ${collapsed
           ? "pointer-events-none max-h-0 -translate-y-1 opacity-0"
           : "max-h-96 translate-y-0 opacity-100"
           }`}
@@ -190,7 +205,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
         </div>
       </div>
 
-      <div className="mt-auto shrink-0 border-t border-white/10 px-2 pb-4 pt-2">
+      <div className="hidden lg:block mt-auto shrink-0 border-t border-white/10 px-2 pb-4 pt-2">
         <Button
           type="button"
           variant="ghost"

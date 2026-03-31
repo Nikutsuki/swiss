@@ -99,12 +99,12 @@ function FloatingVideoWrapper({
       default={{
         x: defaultX,
         y: defaultY,
-        width: 320,
-        height: 180,
+        width: 260,
+        height: 146,
       }}
       bounds="parent"
       lockAspectRatio={16 / 9}
-      minWidth={200}
+      minWidth={140}
       maxWidth="100%"
       className="group/rnd absolute shadow-2xl shadow-black/50 rounded-lg overflow-hidden border border-white/10"
       style={{ zIndex }}
@@ -112,7 +112,7 @@ function FloatingVideoWrapper({
     >
       <div className="w-full h-full relative">
         <div
-          className="drag-handle absolute top-0 left-0 right-0 h-10 z-50 cursor-grab active:cursor-grabbing opacity-0 group-hover/rnd:opacity-100 bg-linear-to-b from-black/80 to-transparent transition-opacity flex items-start justify-center pt-2"
+          className="drag-handle absolute top-0 left-0 right-0 h-10 z-50 cursor-grab active:cursor-grabbing opacity-100 sm:opacity-0 sm:group-hover/rnd:opacity-100 bg-linear-to-b from-black/80 to-transparent transition-opacity flex items-start justify-center pt-2"
           title="Drag to move"
         >
           <div className="w-12 h-1.5 bg-white/50 rounded-full" />
@@ -142,6 +142,7 @@ interface CustomControlsProps {
   subtitleOptions?: { id: string; label: string; language: string }[];
   selectedSubtitleId?: string | null;
   onSubtitleSelect?: (subtitleId: string | null) => void;
+  alwaysVisible?: boolean;
 }
 
 function CustomControls({
@@ -162,6 +163,7 @@ function CustomControls({
   subtitleOptions = [],
   selectedSubtitleId = null,
   onSubtitleSelect,
+  alwaysVisible = false,
 }: CustomControlsProps) {
   const [localTime, setLocalTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -222,13 +224,13 @@ function CustomControls({
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/90 to-transparent p-3 pt-8 flex items-center gap-3 opacity-0 hover:opacity-100 transition-opacity focus-within:opacity-100 pointer-events-auto">
+    <div className={`absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/90 to-transparent p-2 sm:p-3 pt-6 sm:pt-8 flex flex-wrap items-center gap-2 sm:gap-3 transition-opacity focus-within:opacity-100 pointer-events-auto ${alwaysVisible ? "opacity-100" : "opacity-100 sm:opacity-0 sm:hover:opacity-100"}`}>
       {!isLiveStream && duration !== undefined && (
         <>
           <button onClick={handlePlayToggle} className="text-white hover:text-[#52c488] transition-colors" type="button">
             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
           </button>
-          <span className="text-white text-xs font-mono">{formatTime(localTime)}</span>
+          <span className="text-white text-[10px] sm:text-xs font-mono">{formatTime(localTime)}</span>
           <input
             type="range"
             min={0}
@@ -238,17 +240,17 @@ function CustomControls({
             onPointerDown={() => (isScrubbingRef.current = true)}
             onChange={(e) => setLocalTime(Number(e.target.value))}
             onPointerUp={handleScrubEnd}
-            className="flex-1 accent-[#52c488] h-1.5 cursor-pointer bg-white/30 rounded-full min-w-0 appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-[#52c488] [&::-webkit-slider-thumb]:rounded-full"
+            className="flex-1 basis-[120px] accent-[#52c488] h-1.5 cursor-pointer bg-white/30 rounded-full min-w-0 appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-[#52c488] [&::-webkit-slider-thumb]:rounded-full"
           />
-          <span className="text-white text-xs font-mono">{formatTime(duration)}</span>
+          <span className="text-white text-[10px] sm:text-xs font-mono">{formatTime(duration)}</span>
         </>
       )}
 
       {isLiveStream && <div className="flex-1" />}
 
-      <div className="flex items-center gap-3 ml-2 border-l border-white/20 pl-3">
+      <div className="flex items-center gap-2 sm:gap-3 ml-auto border-l border-white/20 pl-2 sm:pl-3">
         {subtitleOptions.length > 0 && onSubtitleSelect && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <Subtitles className="w-4 h-4 text-white/80" />
             <select
               value={selectedSubtitleId ?? ""}
@@ -280,7 +282,7 @@ function CustomControls({
               if (isMuted) onMuteToggle();
               onVolumeChange(Number(e.target.value));
             }}
-            className="w-0 opacity-0 group-hover/volume:w-16 group-hover/volume:opacity-100 transition-all duration-300 accent-[#52c488] h-1.5 cursor-pointer"
+            className={`transition-all duration-300 accent-[#52c488] h-1.5 cursor-pointer ${alwaysVisible ? "w-16 opacity-100" : "w-16 sm:w-0 opacity-100 sm:opacity-0 sm:group-hover/volume:w-16 sm:group-hover/volume:opacity-100"}`}
           />
         </div>
 
@@ -365,11 +367,20 @@ function VideoView({
   const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
   const [parsedSubtitles, setParsedSubtitles] = useState<Record<string, ParsedCue[]>>({});
   const [activeCueText, setActiveCueText] = useState<string>("");
+  const [alwaysShowControls, setAlwaysShowControls] = useState(false);
 
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(pointer: coarse)");
+    const update = () => setAlwaysShowControls(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
   }, []);
 
   useEffect(() => {
@@ -531,13 +542,13 @@ function VideoView({
         crossOrigin="anonymous"
       />
       {!isFullscreen && (
-        <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
+        <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] sm:text-xs text-white z-10">
           {label}
         </div>
       )}
       {activeCueText && (
         <div
-          className="absolute antialiased bottom-16 left-1/2 -translate-x-1/2 px-3 py-2 rounded font-semibold text-white text-center whitespace-pre-line w-full pointer-events-none"
+          className="absolute antialiased bottom-14 sm:bottom-16 left-1/2 -translate-x-1/2 px-3 py-2 rounded font-semibold text-white text-center whitespace-pre-line w-full pointer-events-none"
           style={{
             fontSize: `${subtitleFontSizePx}px`,
             lineHeight: 1.2,
@@ -588,6 +599,7 @@ function VideoView({
         }))}
         selectedSubtitleId={selectedSubtitleId}
         onSubtitleSelect={setSelectedSubtitleId}
+        alwaysVisible={alwaysShowControls}
       />
     </div>
   );
@@ -879,7 +891,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
       )}
 
       {theaterMode && (
-        <div className="relative w-full h-full min-h-[600px] bg-black/50 rounded-lg overflow-hidden border border-[#333]">
+        <div className="relative w-full h-full min-h-[300px] sm:min-h-[420px] lg:min-h-[600px] bg-black/50 rounded-lg overflow-hidden border border-[#333]">
           <div className="absolute inset-0 flex items-center justify-center text-white/20 pointer-events-none">
             <span className="font-mono text-sm">Theater Canvas Active</span>
           </div>

@@ -160,7 +160,9 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
     setStatus('Login successful. Redirecting...');
     if (data?.redirectTo) {
       window.location.assign(data.redirectTo);
+      return;
     }
+    window.location.reload();
   };
 
   const handleLogin = async () => {
@@ -215,17 +217,11 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
         body: JSON.stringify({ email, token: totpCode.replace(/\s/g, '') }),
       });
       if (!verificationResp.ok) throw new Error('Invalid code or account not set up.');
-      const data = await verificationResp.json();
-      if (data?.requireLocalPasskeyEnrollment) {
-        await enrollLocalPasskey(email);
-      }
+      await verificationResp.json();
       setStatus('Signed in. Redirecting...');
       const returnTo = searchParams.get('returnTo') ?? '';
       if (returnTo) window.location.assign(returnTo);
-      else {
-        setIsSignedIn(true);
-        setTokenEmail(email);
-      }
+      else window.location.reload();
     } catch (error: unknown) {
       setStatus(`Error: ${toErrorMessage(error)}`);
     }
@@ -333,24 +329,24 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
 
   if (isSignedIn) {
     return (
-      <div className="auth-background flex flex-1 px-8 py-8">
+      <div className="auth-background flex flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         <Card className="mx-auto w-full max-w-6xl" variant="ghost">
-          <CardBody className="p-6">
-            <div className="mb-8 flex items-start justify-between gap-4">
+          <CardBody className="p-4 sm:p-6">
+            <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div>
-                <CardTitle className="text-4xl mb-2">{tokenEmail}</CardTitle>
+                <CardTitle className="text-2xl sm:text-3xl lg:text-4xl mb-2 wrap-break-word">{tokenEmail}</CardTitle>
                 <p className="text-(--on-surface-variant)">{status || 'Session active.'}</p>
               </div>
-              <Button onClick={handleSignOut} variant="primary" size="lg">
+              <Button onClick={handleSignOut} variant="primary" size="lg" className="w-full sm:w-auto">
                 Sign Out
               </Button>
             </div>
 
-            <div className="rounded-sm bg-(--surface-container-high) p-4 mb-6 flex flex-wrap gap-4 items-center">
-              <Button onClick={handleRegisterThisDevice} variant="secondary" size="sm">
+            <div className="rounded-sm bg-(--surface-container-high) p-4 mb-6 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-center">
+              <Button onClick={handleRegisterThisDevice} variant="secondary" size="sm" className="w-full sm:w-auto">
                 Register this device (passkey)
               </Button>
-              <Button onClick={handleTotpGenerate} variant="secondary" size="sm">
+              <Button onClick={handleTotpGenerate} variant="secondary" size="sm" className="w-full sm:w-auto">
                 Set up authenticator app
               </Button>
             </div>
@@ -358,8 +354,8 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
             {totpSetupUri && (
               <div className="mb-6 p-4 rounded-sm bg-(--surface-container-high)">
                 <p className="text-sm mb-2 text-(--on-surface-variant)">Authenticator provisioning</p>
-                <div className="flex flex-wrap gap-6 items-start">
-                  <QRCodeSVG value={totpSetupUri} size={160} />
+                <div className="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-6 items-start">
+                  <QRCodeSVG value={totpSetupUri} size={140} />
                   {totpSetupSecret && (
                     <p className="text-xs break-all max-w-md">
                       <span className="font-medium">Secret (manual entry): </span>
@@ -370,7 +366,7 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
               </div>
             )}
 
-            <CardTitle className="text-3xl mb-4">Security Devices</CardTitle>
+            <CardTitle className="text-2xl sm:text-3xl mb-4">Security Devices</CardTitle>
             <p className="mb-6 text-(--on-surface-variant)">
               Manage the hardware keys that can unlock your encrypted vault.
             </p>
@@ -378,71 +374,73 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
             {credentialsLoading ? (
               <p className="text-(--on-surface-variant)">Loading devices...</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableCell className="font-bold">Device Label</TableCell>
-                    <TableCell className="font-bold">Status</TableCell>
-                    <TableCell className="font-bold">Registered</TableCell>
-                    <TableCell className="font-bold">Last Used</TableCell>
-                    <TableCell className="font-bold text-right">Actions</TableCell>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {credentials.map((cred) => (
-                    <TableRow key={cred.id}>
-                      <TableCell>
-                        {editingId === cred.id ? (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={newLabel}
-                              onChange={(e) => setNewLabel(e.target.value)}
-                              size="sm"
-                            />
-                            <Button onClick={() => handleRenameCredential(cred.id)} size="sm">
-                              Save
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="font-medium">{cred.credential_label || 'Unnamed Device'}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {cred.revoked_at ? (
-                          <Badge variant="error">Revoked</Badge>
-                        ) : (
-                          <Badge variant="success">Active</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {cred.created_at ? new Date(cred.created_at).toLocaleDateString() : '—'}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {cred.last_used_at ? new Date(cred.last_used_at).toLocaleString() : 'Never'}
-                      </TableCell>
-                      <TableCell className="text-right flex gap-2 justify-end">
-                        {!cred.revoked_at && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingId(cred.id);
-                                setNewLabel(cred.credential_label || '');
-                              }}
-                            >
-                              Rename
-                            </Button>
-                            <Button variant="error" size="sm" onClick={() => handleRevokeCredential(cred.id)}>
-                              Revoke
-                            </Button>
-                          </>
-                        )}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableCell className="font-bold whitespace-nowrap">Device Label</TableCell>
+                      <TableCell className="font-bold whitespace-nowrap">Status</TableCell>
+                      <TableCell className="font-bold whitespace-nowrap">Registered</TableCell>
+                      <TableCell className="font-bold whitespace-nowrap">Last Used</TableCell>
+                      <TableCell className="font-bold text-right whitespace-nowrap">Actions</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {credentials.map((cred) => (
+                      <TableRow key={cred.id}>
+                        <TableCell className="min-w-52">
+                          {editingId === cred.id ? (
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <Input
+                                value={newLabel}
+                                onChange={(e) => setNewLabel(e.target.value)}
+                                size="sm"
+                              />
+                              <Button onClick={() => handleRenameCredential(cred.id)} size="sm">
+                                Save
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="font-medium">{cred.credential_label || 'Unnamed Device'}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {cred.revoked_at ? (
+                            <Badge variant="error">Revoked</Badge>
+                          ) : (
+                            <Badge variant="success">Active</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {cred.created_at ? new Date(cred.created_at).toLocaleDateString() : '—'}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {cred.last_used_at ? new Date(cred.last_used_at).toLocaleString() : 'Never'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {!cred.revoked_at && (
+                            <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingId(cred.id);
+                                  setNewLabel(cred.credential_label || '');
+                                }}
+                              >
+                                Rename
+                              </Button>
+                              <Button variant="error" size="sm" onClick={() => handleRevokeCredential(cred.id)}>
+                                Revoke
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardBody>
         </Card>
@@ -452,10 +450,10 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
 
   return (
     <div className="flex flex-1">
-      <div className="auth-background flex flex-1 flex-col px-8 py-6">
+      <div className="auth-background flex flex-1 flex-col px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         <Card className="w-full max-w-md m-auto" variant="ghost">
-          <CardBody className="p-6">
-            <CardTitle className="text-4xl mb-4">Authenticate into Swiss</CardTitle>
+          <CardBody className="p-4 sm:p-6">
+            <CardTitle className="text-2xl sm:text-3xl lg:text-4xl mb-4">Authenticate into Swiss</CardTitle>
             <Input
               type="email"
               title="IDENTITY IDENTIFIER"
@@ -465,11 +463,11 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
               className="mb-4"
             />
             {loginMode === 'webauthn' ? (
-              <div className="flex gap-4">
-                <Button onClick={handleRegister} variant="secondary" className="flex-1" size="lg">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <Button onClick={handleRegister} variant="secondary" className="flex-1 min-h-13" size="lg">
                   Register
                 </Button>
-                <Button onClick={handleLogin} variant="primary" className="flex-1" size="lg">
+                <Button onClick={handleLogin} variant="primary" className="flex-1 min-h-13" size="lg">
                   Authenticate
                 </Button>
               </div>
@@ -483,7 +481,7 @@ export default function LoginPageClient({ initialHasSsoToken, initialSsoTokenEma
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value)}
                 />
-                <Button onClick={handleTOTPLogin} variant="primary" size="lg">
+                <Button onClick={handleTOTPLogin} variant="primary" size="lg" className="min-h-13">
                   Verify code
                 </Button>
               </div>

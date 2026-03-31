@@ -34,7 +34,7 @@ export function ArtifactHeroLayout({
   children,
 }: ArtifactHeroLayoutProps) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-24 pb-24 pt-12">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-4 sm:px-8 lg:px-24 pb-8 sm:pb-12 lg:pb-24 pt-6 sm:pt-8 lg:pt-12">
       <div className="h-1 w-full rounded-full bg-(--surface-container-low)">
         <div
           className="h-full rounded-full bg-(--security-emerald) shadow-[0_0_20px_1px_var(--security-emerald)] transition-all duration-1000 ease-linear"
@@ -43,7 +43,7 @@ export function ArtifactHeroLayout({
           }}
         />
       </div>
-      <div className="mt-6 flex flex-wrap gap-4 items-center">
+      <div className="mt-4 sm:mt-6 flex flex-wrap gap-3 sm:gap-4 items-center">
         {isEncrypted ? (
           <span className="text-sm uppercase tracking-wider text-(--on-surface) bg-(--primary-fixed) px-3 py-1 rounded-2xl">
             {artifactKindBadge}
@@ -57,9 +57,9 @@ export function ArtifactHeroLayout({
           ID: {pasteIdFragment}
         </span>
       </div>
-      <h1 className="text-7xl font-bold wrap-break-word">{headline}</h1>
+      <h1 className="text-3xl sm:text-5xl lg:text-7xl font-bold wrap-break-word">{headline}</h1>
       <div className="flex flex-col gap-4 justify-between lg:flex-row lg:items-start">
-        <div className="flex flex-wrap gap-8">
+        <div className="flex flex-wrap gap-4 sm:gap-8">
           {originLabel !== undefined && originValue !== undefined ? (
             <div className="flex min-w-0 flex-col gap-1">
               <span className="text-xs font-light tracking-widest text-(--on-surface-variant)">

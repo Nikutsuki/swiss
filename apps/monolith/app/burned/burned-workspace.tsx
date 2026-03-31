@@ -51,16 +51,16 @@ export default function BurnedWorkspace() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex flex-col px-24 pt-24">
+      <div className="flex flex-col px-4 sm:px-8 lg:px-24 pt-8 sm:pt-12 lg:pt-24">
         <div className="mb-6 flex items-baseline flex-wrap gap-x-2">
-          <h1 className="text-7xl font-bold">BURNED</h1>
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-bold">BURNED</h1>
         </div>
         <p className="mb-6 max-w-2xl text-(--on-surface-variant)">
           Artifacts with ciphertext removed — after expiry (lazy wipe on read) or
           after you burned them from the vault. Rows stay for your records; title
           and content are gone from the server.
         </p>
-        <div className="mb-10">
+        <div className="mb-6 sm:mb-10">
           <Button
             type="button"
             variant="secondary"
@@ -73,7 +73,7 @@ export default function BurnedWorkspace() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 px-24 pb-24">
+      <div className="min-h-0 flex-1 px-4 sm:px-8 lg:px-24 pb-8 sm:pb-12 lg:pb-24">
         {loading ? (
           <p className="text-sm text-(--on-surface-variant)">Loading…</p>
         ) : error ? (
@@ -85,7 +85,7 @@ export default function BurnedWorkspace() {
           </p>
         ) : data ? (
           <div className="overflow-x-auto rounded-xs border border-white/10 bg-(--surface-container-low)">
-            <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
+            <table className="w-full min-w-3xl sm:min-w-2xl border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="sticky left-0 z-10 bg-(--surface-container-low) px-3 py-3 font-semibold text-(--on-surface-variant)">
@@ -120,7 +120,7 @@ export default function BurnedWorkspace() {
                     key={paste.paste_id}
                     className="border-b border-white/5 last:border-0"
                   >
-                    <td className="sticky left-0 z-10 max-w-[12rem] bg-(--surface-container-low) px-3 py-2 font-mono text-xs break-all text-(--on-surface)">
+                    <td className="sticky left-0 z-10 max-w-48 bg-(--surface-container-low) px-3 py-2 font-mono text-xs break-all text-(--on-surface)">
                       {paste.paste_id}
                     </td>
                     <td className="whitespace-nowrap px-2 py-2 text-(--on-surface-variant)">

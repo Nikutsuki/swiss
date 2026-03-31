@@ -88,10 +88,10 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
 
   return (
     <Card>
-      <CardBody className="flex gap-4 items-center !mt-0 py-2">
+      <CardBody className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center mt-0! py-2">
         {activeType === 'none' ? (
           <>
-            <Button onClick={handleScreenShare} variant="secondary" className="flex-1" bold>
+            <Button onClick={handleScreenShare} variant="secondary" className="w-full sm:flex-1" bold>
               <MonitorUp className="w-4 h-4 mr-2" /> Share Screen
             </Button>
             
@@ -102,13 +102,13 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
               ref={fileInputRef}
               onChange={handleFileChange}
             />
-            <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="flex-1" bold>
+            <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full sm:flex-1" bold>
               <FileVideo className="w-4 h-4 mr-2" /> Stream File
             </Button>
           </>
         ) : (
           <>
-            <Button onClick={handleStop} variant="error" className="flex-1" bold>
+            <Button onClick={handleStop} variant="error" className="w-full sm:flex-1" bold>
               <X className="w-4 h-4 mr-2" /> Stop {activeType === 'screen' ? 'Screen' : 'File'}
             </Button>
 
@@ -121,20 +121,20 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
               onChange={handleSubtitleUpload}
               multiple
             />
-            <Button onClick={() => subtitleInputRef.current?.click()} variant="secondary" className="flex-none" bold>
+            <Button onClick={() => subtitleInputRef.current?.click()} variant="secondary" className="w-full sm:w-auto sm:flex-none" bold>
               <Subtitles className="w-4 h-4 mr-2" /> Add .VTT
             </Button>
           </>
         )}
       </CardBody>
-      <CardBody className="flex flex-col gap-3 !mt-0 pt-0">
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-(--on-surface-variant) whitespace-nowrap">Stream Config</div>
-          <div className="flex-1 grid grid-cols-3 gap-2">
+      <CardBody className="flex flex-col gap-3 mt-0! pt-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="text-xs text-(--on-surface-variant)">Stream Config</div>
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
             <select
               value={quality.resolution}
               onChange={(e) => handleResolutionChange(e.target.value)}
-              className="bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
+              className="w-full bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
             >
               <option value="720p">720p</option>
               <option value="1080p">1080p</option>
@@ -143,7 +143,7 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
             <select
               value={quality.fps}
               onChange={(e) => handleFpsChange(Number(e.target.value))}
-              className="bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
+              className="w-full bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
             >
               <option value={30}>30 fps</option>
               <option value={60}>60 fps</option>
@@ -151,7 +151,7 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
             <select
               value={quality.bitrateMbps}
               onChange={(e) => handleBitrateChange(Number(e.target.value))}
-              className="bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
+              className="w-full bg-(--surface-container-high) border border-(--outline-variant)/30 rounded-md px-2 py-1 text-sm"
             >
               <option value={2}>2 Mbps</option>
               <option value={5}>5 Mbps</option>

@@ -60,7 +60,7 @@ function TransferCardInner({ transfer, variant, onDismiss, onStop }: TransferCar
     Boolean(onStop);
 
   return (
-    <div className="relative border border-(--outline-variant)/10 bg-(--surface-container-lowest) p-4 pr-10">
+    <div className="relative border border-(--outline-variant)/10 bg-(--surface-container-lowest) p-3 sm:p-4 pr-8 sm:pr-10">
       {canDismiss && onDismiss ? (
         <button
           type="button"
@@ -86,7 +86,7 @@ function TransferCardInner({ transfer, variant, onDismiss, onStop }: TransferCar
           </p>
         </div>
         <div className="text-right">
-          <span className="font-['Space_Grotesk'] text-2xl font-bold text-white">
+          <span className="font-['Space_Grotesk'] text-xl sm:text-2xl font-bold text-white">
             {transfer.status === "queued" ? "—" : `${pct}%`}
           </span>
         </div>

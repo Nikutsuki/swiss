@@ -305,9 +305,9 @@ export default function VaultWorkspace() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex flex-col px-24 pt-24">
+      <div className="flex flex-col px-4 sm:px-8 lg:px-24 pt-8 sm:pt-12 lg:pt-24">
         <div className="mb-6 flex items-baseline">
-          <h1 className="text-7xl font-bold">VAULT</h1>
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-bold">VAULT</h1>
         </div>
         <p className="mb-6 max-w-2xl text-(--on-surface-variant)">
           See which registered devices have a wrapped DEK per paste. A checkmark
@@ -318,7 +318,7 @@ export default function VaultWorkspace() {
           immediately; expired pastes are wiped on the next read and then appear
           under Burned.
         </p>
-        <div className="mb-10 flex flex-wrap items-center gap-3">
+        <div className="mb-6 sm:mb-10 flex flex-wrap items-center gap-3">
           <Button
             type="button"
             variant="secondary"
@@ -356,7 +356,7 @@ export default function VaultWorkspace() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 px-24 pb-24">
+      <div className="min-h-0 flex-1 px-4 sm:px-8 lg:px-24 pb-8 sm:pb-12 lg:pb-24">
         {device ? (
           <p className="mb-4 text-sm text-(--on-surface-variant)">
             This browser:{" "}
@@ -385,7 +385,7 @@ export default function VaultWorkspace() {
           </p>
         ) : coverage ? (
           <div className="overflow-x-auto rounded-xs border border-white/10 bg-(--surface-container-low)">
-            <table className="w-full min-w-xl border-collapse text-left text-sm">
+            <table className="w-full min-w-4xl sm:min-w-xl border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="sticky left-0 z-10 bg-(--surface-container-low) px-3 py-3 font-semibold text-(--on-surface-variant)">

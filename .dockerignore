@@ -1,0 +1,16 @@
+.git
+.gitignore
+.cursor
+.next
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/.turbo
+**/*.log
+.env
+.env.*
+!.env.example
+certs
+tmp

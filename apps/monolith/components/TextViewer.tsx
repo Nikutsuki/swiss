@@ -171,7 +171,7 @@ export default function TextViewer({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-(--surface-container-lowest) shadow-2xl">
         {showChrome ? (
-          <div className="shrink-0 flex items-center gap-2 border-b border-(--outline-variant)/5 bg-(--surface-container-low)/50 px-6 py-4">
+          <div className="shrink-0 flex items-center gap-2 border-b border-(--outline-variant)/5 bg-(--surface-container-low)/50 px-3 sm:px-6 py-3 sm:py-4">
             <div className="h-2.5 w-2.5 rounded-full bg-(--outline-variant)/30" />
             <div className="h-2.5 w-2.5 rounded-full bg-(--outline-variant)/30" />
             <div className="h-2.5 w-2.5 rounded-full bg-(--outline-variant)/30" />
@@ -181,13 +181,13 @@ export default function TextViewer({
           </div>
         ) : null}
 
-        <div className="flex-1 min-h-0 overflow-auto p-8 lg:p-12">
+        <div className="flex-1 min-h-0 overflow-auto p-4 sm:p-6 lg:p-12">
           {isCode ? (
-            <div className="min-w-max">
+            <div className="w-full min-w-0">
               <SyntaxHighlighter
                 language={syntaxLanguage}
                 style={oneDark}
-                wrapLongLines={false}
+                wrapLongLines={true}
                 customStyle={{
                   margin: 0,
                   padding: 0,

@@ -16,17 +16,17 @@ export function ParticipantList() {
       </div>
       
       <CardBody className="flex flex-col gap-2 mt-0! flex-1 min-h-0 overflow-y-auto pr-1">
-        <div className="flex items-center justify-between p-2 rounded bg-(--surface-container-high)">
+        <div className="flex items-center justify-between gap-2 p-2 rounded bg-(--surface-container-high)">
           <span className="text-sm font-medium">You</span>
-          <span className="text-xs text-(--on-surface-variant) font-mono truncate max-w-[120px]">
+          <span className="text-xs text-(--on-surface-variant) font-mono truncate max-w-[140px] sm:max-w-[120px]">
             {peerId}
           </span>
         </div>
         
         {participants.map((id) => (
-          <div key={id} className="flex items-center justify-between p-2 rounded border border-(--outline-variant)/30">
+          <div key={id} className="flex items-center justify-between gap-2 p-2 rounded border border-(--outline-variant)/30">
             <span className="text-sm">Peer</span>
-            <span className="text-xs text-(--on-surface-variant) font-mono truncate max-w-[120px]">
+            <span className="text-xs text-(--on-surface-variant) font-mono truncate max-w-[140px] sm:max-w-[120px]">
               {id}
             </span>
           </div>

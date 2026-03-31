@@ -167,5 +167,5 @@ func (h *Handler) TOTPVerify(w http.ResponseWriter, r *http.Request) {
 	h.setSSOCookie(w, jwtToken)
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(totpVerifyResponse{RequireLocalPasskeyEnrollment: true})
+	_ = json.NewEncoder(w).Encode(totpVerifyResponse{RequireLocalPasskeyEnrollment: false})
 }

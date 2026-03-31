@@ -174,10 +174,10 @@ export default function EncryptedMessagesWorkspace() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex flex-col px-24 pt-24">
+      <div className="flex flex-col px-4 sm:px-8 lg:px-24 pt-8 sm:pt-12 lg:pt-24">
         <div className="mb-6 flex items-baseline flex-wrap gap-x-2">
-          <h1 className="text-7xl font-bold">ENCRYPTED</h1>
-          <h1 className="text-7xl font-bold text-(--security-emerald)">
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-bold">ENCRYPTED</h1>
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-bold text-(--security-emerald)">
             ARTIFACTS
           </h1>
         </div>
@@ -188,9 +188,9 @@ export default function EncryptedMessagesWorkspace() {
         </p>
       </div>
 
-      <div className="flex min-h-0 flex-1 px-24 pb-24">
+      <div className="flex min-h-0 flex-1 px-4 sm:px-8 lg:px-24 pb-8 sm:pb-12 lg:pb-24">
         <section className="flex min-h-0 w-full flex-col rounded-xs border border-white/10 bg-(--surface-container-low)">
-          <div className="flex h-16 items-center justify-between border-b border-white/10 px-4 py-3">
+          <div className="flex min-h-16 items-center justify-between border-b border-white/10 px-3 sm:px-4 py-3">
             <h2 className="text-sm font-semibold tracking-wide text-(--on-surface-variant)">
               Artifacts
             </h2>
@@ -241,7 +241,7 @@ export default function EncryptedMessagesWorkspace() {
                     <li key={row.paste_id}>
                       <Link
                         href={`/encrypted/${row.paste_id}`}
-                        className="block border border-transparent px-3 py-2 transition-colors hover:bg-(--surface-container-high)"
+                        className="block border border-transparent px-3 py-2 transition-colors hover:bg-(--surface-container-high) active:bg-(--surface-container-high)"
                       >
                         <div className="mb-1 flex items-center justify-between gap-2">
                           <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-(--security-emerald)">

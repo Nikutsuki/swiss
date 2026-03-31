@@ -10,9 +10,9 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-(--surface) text-(--on-surface) flex justify-center items-center">
-      <main className="h-full max-w-7xl px-20 py-20">
-        <section className="h-full mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-8 lg:gap-10">
+    <div className="min-h-dvh bg-(--surface) text-(--on-surface) flex justify-center items-center">
+      <main className="w-full max-w-7xl px-4 sm:px-8 lg:px-16 py-8 sm:py-12 lg:py-16">
+        <section className="mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-8 lg:gap-10">
           <div className="flex flex-col justify-center text-center lg:text-left">
             <h1 className="font-headline text-4xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight uppercase">
               Direct

@@ -650,8 +650,8 @@ export default function SessionWorkspace() {
   const primaryIncoming = incomingList[incomingList.length - 1];
 
   return (
-    <div className="relative flex min-h-full w-full flex-1 flex-col bg-(--surface) pb-28 font-(family-name:--font-inter) text-(--on-surface) selection:bg-(--security-emerald) selection:text-(--on-primary)">
-      <div className="pointer-events-none fixed top-18 left-0 z-40 w-full">
+    <div className="relative flex min-h-full w-full flex-1 flex-col bg-(--surface) pb-16 sm:pb-20 lg:pb-28 font-(family-name:--font-inter) text-(--on-surface) selection:bg-(--security-emerald) selection:text-(--on-primary)">
+      <div className="pointer-events-none absolute top-0 left-0 z-20 w-full">
         <div
           className="drop-burn-progress transition-[width] duration-500"
           style={{ width: `${burnPct}%` }}
@@ -666,11 +666,11 @@ export default function SessionWorkspace() {
         onChange={(e) => handleFiles(e.target.files)}
       />
 
-      <div className="flex w-full max-w-none flex-1 flex-col px-6 pt-10 md:px-10 lg:px-12 xl:px-16 2xl:px-20">
-        <div className="grid w-full min-w-0 flex-1 grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10 xl:gap-12">
-          <aside className="flex flex-col gap-10 lg:col-span-2">
+      <div className="flex w-full max-w-none flex-1 flex-col px-3 sm:px-6 pt-6 sm:pt-8 lg:pt-10 md:px-10 lg:px-12 xl:px-16 2xl:px-20">
+        <div className="grid w-full min-w-0 flex-1 grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-12 lg:gap-10 xl:gap-12">
+          <aside className="flex flex-col gap-6 sm:gap-8 lg:gap-10 lg:col-span-2">
             <section>
-              <h2 className="mb-4 font-['Space_Grotesk'] text-3xl font-bold tracking-tight text-white">
+              <h2 className="mb-3 sm:mb-4 font-['Space_Grotesk'] text-2xl sm:text-3xl font-bold tracking-tight text-white">
                 Secure Hub
               </h2>
               <p className="text-sm leading-relaxed text-(--on-surface-variant)">
@@ -721,7 +721,7 @@ export default function SessionWorkspace() {
                   <div className="flex justify-center rounded-lg bg-white p-3">
                     <QRCodeSVG
                       value={inviteUrl}
-                      size={160}
+                      size={140}
                       level="M"
                       title="Scan to open the invite link on another device"
                     />
@@ -742,10 +742,10 @@ export default function SessionWorkspace() {
             </section>
           </aside>
 
-          <div className="flex min-h-0 min-w-0 flex-col gap-8 lg:col-span-10">
-            <div className="grid min-h-[min(58vh,36rem)] grid-cols-1 gap-4 md:grid-cols-2 md:min-h-[min(52vh,32rem)] lg:min-h-[min(62vh,40rem)] lg:auto-rows-fr">
+          <div className="flex min-h-0 min-w-0 flex-col gap-6 sm:gap-8 lg:col-span-10">
+            <div className="grid min-h-[min(56vh,34rem)] grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:min-h-[min(52vh,32rem)] lg:min-h-[min(62vh,40rem)] lg:auto-rows-fr">
               <div
-                className="group relative flex h-full min-h-72 cursor-pointer md:min-h-0"
+                className="group relative flex h-full min-h-56 sm:min-h-72 cursor-pointer md:min-h-0"
                 role="button"
                 tabIndex={0}
                 onClick={() => fileInputRef.current?.click()}
@@ -765,7 +765,7 @@ export default function SessionWorkspace() {
                 }}
               >
                 <div className="pointer-events-none absolute inset-0 bg-(--security-emerald)/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative flex h-full min-h-72 w-full flex-col items-center justify-center overflow-hidden border border-(--outline-variant)/10 bg-(--surface-container-lowest) p-8 text-center md:min-h-0">
+                <div className="relative flex h-full min-h-56 sm:min-h-72 w-full flex-col items-center justify-center overflow-hidden border border-(--outline-variant)/10 bg-(--surface-container-lowest) p-4 sm:p-6 md:p-8 text-center md:min-h-0">
                   <div
                     className="pointer-events-none absolute inset-0 opacity-5"
                     style={{
@@ -819,7 +819,7 @@ export default function SessionWorkspace() {
               </div>
 
               <div className="relative flex h-full min-h-72 md:min-h-0">
-                <div className="relative flex h-full min-h-72 w-full flex-col items-center justify-center overflow-hidden border border-(--outline-variant)/10 bg-(--surface-container-lowest) p-8 text-center md:min-h-0">
+                <div className="relative flex h-full min-h-56 sm:min-h-72 w-full flex-col items-center justify-center overflow-hidden border border-(--outline-variant)/10 bg-(--surface-container-lowest) p-4 sm:p-6 md:p-8 text-center md:min-h-0">
                   <div
                     className="drop-scan-line pointer-events-none absolute inset-0 opacity-20"
                     aria-hidden
@@ -864,7 +864,7 @@ export default function SessionWorkspace() {
               </div>
             </div>
 
-            <div className="border border-(--outline-variant)/10 bg-(--surface-container-low) p-8">
+            <div className="border border-(--outline-variant)/10 bg-(--surface-container-low) p-4 sm:p-6 md:p-8">
               <div className="flex flex-col gap-8">
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                   <div>
@@ -872,7 +872,7 @@ export default function SessionWorkspace() {
                       Outgoing transfers
                     </span>
                     <div
-                      className="max-h-[min(50vh,28rem)] space-y-4 overflow-y-auto pr-1"
+                      className="max-h-[min(45vh,24rem)] sm:max-h-[min(50vh,28rem)] space-y-4 overflow-y-auto pr-1"
                       data-testid="outgoing-transfer-list"
                     >
                       {outgoingList.length === 0 ? (
@@ -903,7 +903,7 @@ export default function SessionWorkspace() {
                       Incoming transfers
                     </span>
                     <div
-                      className="max-h-[min(50vh,28rem)] space-y-4 overflow-y-auto pr-1"
+                      className="max-h-[min(45vh,24rem)] sm:max-h-[min(50vh,28rem)] space-y-4 overflow-y-auto pr-1"
                       data-testid="incoming-transfer-list"
                     >
                       {incomingList.length === 0 ? (
@@ -955,26 +955,26 @@ export default function SessionWorkspace() {
                 </div>
               </div>
 
-              <div className="mt-8 flex flex-wrap gap-4">
+              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
                 <button
                   type="button"
                   onClick={() => setPauseSend((p) => !p)}
-                  className="bg-white px-8 py-3 text-xs font-bold tracking-widest text-(--on-primary) uppercase transition-all hover:bg-(--security-emerald) hover:text-(--on-primary) active:scale-95"
+                  className="w-full sm:w-auto bg-white px-6 sm:px-8 py-3 text-xs font-bold tracking-widest text-(--on-primary) uppercase transition-all hover:bg-(--security-emerald) hover:text-(--on-primary) active:scale-95"
                 >
                   {pauseSend ? "Resume uploads" : "Pause uploads"}
                 </button>
                 <button
                   type="button"
                   onClick={() => void terminate()}
-                  className="border border-(--outline-variant)/20 px-8 py-3 text-xs font-bold tracking-widest text-white uppercase transition-all hover:bg-(--surface-container-high) active:scale-95"
+                  className="w-full sm:w-auto border border-(--outline-variant)/20 px-6 sm:px-8 py-3 text-xs font-bold tracking-widest text-white uppercase transition-all hover:bg-(--surface-container-high) active:scale-95"
                 >
                   Terminate session
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="flex items-center gap-6 border border-(--outline-variant)/5 bg-(--surface-container-lowest) p-6">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
+              <div className="flex items-center gap-4 sm:gap-6 border border-(--outline-variant)/5 bg-(--surface-container-lowest) p-4 sm:p-6">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-(--surface-container-high)">
                   <MdComputer className="text-2xl text-(--security-emerald)" aria-hidden />
                 </div>
@@ -987,7 +987,7 @@ export default function SessionWorkspace() {
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-6 border border-(--outline-variant)/5 bg-(--surface-container-lowest) p-6">
+              <div className="flex items-center gap-4 sm:gap-6 border border-(--outline-variant)/5 bg-(--surface-container-lowest) p-4 sm:p-6">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-(--security-emerald)/10">
                   <MdHub className="text-2xl text-(--security-emerald)" aria-hidden />
                 </div>

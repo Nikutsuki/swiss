@@ -43,18 +43,18 @@ const pillars: {
 export default function Home() {
   return (
     <div className="bg-(--surface) font-sans text-(--on-surface)">
-      <main className="min-h-screen">
+      <main className="min-h-dvh">
         {/* Combined Hero & WebRTC Architecture Section */}
-        <section className="mx-auto grid max-w-400 grid-cols-1 items-center gap-16 border-b border-(--on-surface)/5 px-8 py-16 md:px-12 md:py-24 xl:grid-cols-2 xl:gap-12 2xl:px-24">
+        <section className="mx-auto grid max-w-400 grid-cols-1 items-center gap-10 sm:gap-12 xl:gap-12 border-b border-(--on-surface)/5 px-4 sm:px-8 md:px-12 2xl:px-24 py-10 sm:py-14 md:py-20">
           {/* Hero Content (Left) */}
           <div className="z-10 flex h-full flex-col justify-center">
-            <h1 className="mb-6 font-['Space_Grotesk'] text-5xl leading-[0.9] font-bold tracking-tight text-(--on-surface) md:text-7xl xl:text-7xl">
+            <h1 className="mb-5 sm:mb-6 font-['Space_Grotesk'] text-3xl sm:text-4xl md:text-6xl xl:text-7xl leading-[0.9] font-bold tracking-tight text-(--on-surface)">
               DIRECT LINE.
               <br />
               ZERO TRACE.
             </h1>
 
-            <p className="mb-10 max-w-xl text-lg leading-relaxed text-(--on-surface-variant) md:text-xl">
+            <p className="mb-8 sm:mb-10 max-w-xl text-sm sm:text-base md:text-xl leading-relaxed text-(--on-surface-variant)">
               Peer-to-peer file transfer powered by WebRTC. Your data never
               touches a server. Encrypted at the source, decrypted at the
               destination.
@@ -65,7 +65,7 @@ export default function Home() {
                 asChild
                 variant="primary"
                 size="md"
-                className="h-auto min-h-12 px-8 py-4 text-sm font-bold tracking-widest uppercase shadow-lg shadow-black/40 hover:scale-[0.98]"
+                className="w-full sm:w-auto h-auto min-h-11 sm:min-h-12 px-6 sm:px-8 py-3 sm:py-4 text-xs sm:text-sm font-bold tracking-widest uppercase shadow-lg shadow-black/40 hover:scale-[0.98]"
               >
                 <Link href="/session">Start Transfer</Link>
               </Button>
@@ -73,9 +73,9 @@ export default function Home() {
           </div>
 
           {/* WebRTC Architecture Diagram (Right) */}
-          <Card className="relative flex h-full w-full flex-col justify-center overflow-hidden rounded-none border border-(--on-surface)/10 p-6 shadow-xl md:p-10">
+          <Card className="relative flex h-full w-full flex-col justify-center overflow-hidden rounded-none border border-(--on-surface)/10 p-4 sm:p-6 md:p-10 shadow-xl">
             <div className="relative z-10 mb-8 flex w-full flex-col items-stretch justify-between gap-6 md:flex-row">
-              <Card className="w-full flex-1 rounded-none border border-(--on-surface)/5 border-l-4 border-l-(--security-emerald) bg-(--surface-container-high) p-6 shadow-inner">
+              <Card className="w-full flex-1 rounded-none border border-(--on-surface)/5 border-l-4 border-l-(--security-emerald) bg-(--surface-container-high) p-4 sm:p-6 shadow-inner">
                 <h4 className="mb-5 text-sm font-bold tracking-widest text-(--on-surface) uppercase">
                   Node A: Sender
                 </h4>
@@ -107,7 +107,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <Card className="w-full flex-1 rounded-none border border-(--on-surface)/5 border-r-4 border-r-(--on-surface) bg-(--surface-container-high) p-6 shadow-inner">
+              <Card className="w-full flex-1 rounded-none border border-(--on-surface)/5 border-r-4 border-r-(--on-surface) bg-(--surface-container-high) p-4 sm:p-6 shadow-inner">
                 <h4 className="mb-5 text-sm font-bold tracking-widest text-(--on-surface) uppercase">
                   Node B: Receiver
                 </h4>
@@ -158,9 +158,9 @@ export default function Home() {
         </section>
 
         {/* Transfer Action Block */}
-        <section className="border-b border-(--on-surface)/5 bg-(--surface) px-8 py-20 md:px-12 2xl:px-24">
+        <section className="border-b border-(--on-surface)/5 bg-(--surface) px-4 sm:px-8 md:px-12 2xl:px-24 py-10 sm:py-14 md:py-20">
           <div className="mx-auto max-w-400 border border-(--on-surface)/10 bg-linear-to-b from-(--on-surface)/5 to-transparent p-1">
-            <Card className="rounded-none border-0 bg-(--surface-container-low)/80 p-10 text-center backdrop-blur-sm">
+            <Card className="rounded-none border-0 bg-(--surface-container-low)/80 p-5 sm:p-8 md:p-10 text-center backdrop-blur-sm">
               <div className="mb-6 flex justify-center">
                 <div className="flex h-14 w-14 items-center justify-center border border-(--security-emerald)/30 bg-(--security-emerald)/5">
                   <MdUploadFile
@@ -199,12 +199,12 @@ export default function Home() {
         </section>
 
         {/* Technical Pillars */}
-        <section className="bg-(--surface-container-lowest) px-8 py-20 md:px-12 2xl:px-24">
+        <section className="bg-(--surface-container-lowest) px-4 sm:px-8 md:px-12 2xl:px-24 py-10 sm:py-14 md:py-20">
           <div className="mx-auto grid max-w-400 grid-cols-1 gap-0.5 bg-(--outline-variant)/10 md:grid-cols-2 lg:grid-cols-4">
             {pillars.map(({ icon: Icon, title, body }) => (
               <Card
                 key={title}
-                className="group rounded-none border-0 bg-(--surface) p-10 transition-colors hover:bg-(--surface-container-low)"
+                className="group rounded-none border-0 bg-(--surface) p-5 sm:p-8 md:p-10 transition-colors hover:bg-(--surface-container-low)"
               >
                 <Icon
                   className="mb-5 block text-3xl text-(--security-emerald)"

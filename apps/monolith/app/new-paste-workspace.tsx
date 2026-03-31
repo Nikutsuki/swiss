@@ -221,19 +221,19 @@ export default function NewPasteWorkspace() {
       <Modal
         isOpen={shareResultUrl.length > 0}
         onClose={() => setShareResultUrl("")}
-        className="h-screen w-screen max-w-none rounded-none border-0 bg-black/70 backdrop:bg-black/75"
+        className="h-dvh w-screen max-w-none rounded-none border-0 bg-black/70 backdrop:bg-black/75"
       >
         <div className="flex h-full w-full items-center justify-center">
-          <div className="flex w-full max-w-2xl flex-col gap-5 rounded-xl border border-white/15 bg-(--surface-container-low) p-8">
-            <h2 className="text-3xl font-bold">Shared Paste Link Ready</h2>
+          <div className="flex w-full max-w-2xl flex-col gap-4 sm:gap-5 rounded-xl border border-white/15 bg-(--surface-container-low) p-4 sm:p-6 md:p-8">
+            <h2 className="text-2xl sm:text-3xl font-bold">Shared Paste Link Ready</h2>
             <p className="text-sm text-(--on-surface-variant)">
               Share this link with anyone. Password-protected links still require the password.
             </p>
             <Input size="lg" value={shareResultUrl} readOnly />
-            <div className="flex items-center justify-center rounded-lg bg-white p-4">
-              {shareResultUrl ? <QRCodeSVG value={shareResultUrl} size={220} /> : null}
+            <div className="flex items-center justify-center rounded-lg bg-white p-3 sm:p-4">
+              {shareResultUrl ? <QRCodeSVG value={shareResultUrl} size={180} /> : null}
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 type="button"
                 size="md"
@@ -252,19 +252,19 @@ export default function NewPasteWorkspace() {
           </div>
         </div>
       </Modal>
-      <div className="flex flex-col px-24 pt-24">
+      <div className="flex flex-col px-4 sm:px-8 lg:px-24 pt-8 sm:pt-12 lg:pt-24">
         <div className="mb-6 flex items-baseline">
-          <h1 className="text-7xl font-bold">NEW&nbsp;</h1>
-          <h1 className="text-7xl font-bold text-(--security-emerald)">
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-bold">NEW&nbsp;</h1>
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-bold text-(--security-emerald)">
             ARTIFACT
           </h1>
         </div>
-        <h2 className="mb-10 text-(--on-surface-variant)">
+        <h2 className="mb-6 sm:mb-10 text-sm sm:text-base text-(--on-surface-variant)">
           Input raw data or code into the terminal below. Artifacts are processed
           with 256-bit encryption by default if stored in the secure vault.
         </h2>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 px-24 pb-24">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 sm:px-8 lg:px-24 pb-8 sm:pb-12 lg:pb-24">
         {!device && (
           <p className="text-sm text-(--on-surface-variant)">
             Register this browser once so pastes can be encrypted for your
@@ -297,8 +297,8 @@ export default function NewPasteWorkspace() {
             onChange={(e) => setSharePassword(e.target.value)}
           />
         ) : null}
-        <div className="flex justify-between pt-12">
-          <div className="flex gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 pt-6 sm:pt-8 lg:pt-12">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <Select
               title="Encryption"
               size="lg"
