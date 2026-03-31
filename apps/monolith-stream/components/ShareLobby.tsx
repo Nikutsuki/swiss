@@ -7,9 +7,10 @@ import { Check, Copy } from "lucide-react";
 
 interface ShareLobbyProps {
   lobbyId: string;
+  fitHeight?: boolean;
 }
 
-export function ShareLobby({ lobbyId }: ShareLobbyProps) {
+export function ShareLobby({ lobbyId, fitHeight = false }: ShareLobbyProps) {
   const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -26,10 +27,22 @@ export function ShareLobby({ lobbyId }: ShareLobbyProps) {
   if (!url) return null;
 
   return (
-    <Card className="max-w-md mx-auto mt-8">
+    <Card
+      className={
+        fitHeight
+          ? "h-full min-h-0 flex flex-col max-w-none mx-0 mt-0"
+          : "max-w-md mx-auto mt-8"
+      }
+    >
       <CardTitle>Invite Others</CardTitle>
-      <CardBody className="flex flex-col items-center gap-6">
-        <div className="bg-white p-4 rounded-lg">
+      <CardBody
+        className={
+          fitHeight
+            ? "flex flex-col items-center gap-6 mt-0! flex-1 min-h-0"
+            : "flex flex-col items-center gap-6"
+        }
+      >
+        <div className="bg-white p-4 mt-8 rounded-lg">
           <QRCodeSVG value={url} size={200} />
         </div>
         
@@ -37,7 +50,7 @@ export function ShareLobby({ lobbyId }: ShareLobbyProps) {
           <Input 
             value={url} 
             readOnly 
-            className="flex-1 font-mono text-xs" 
+            className="flex-1 font-mono text-xs w-full" 
             title="Lobby URL"
           />
           <Button 

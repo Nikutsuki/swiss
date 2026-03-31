@@ -70,7 +70,7 @@ export type TextareaProps = Omit<
 
 export function Input({ className, title, variant, size, ...props }: InputProps) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 w-full">
       {title && <label className="text-sm font-medium">{title}</label>}
       <input
         className={cn(inputVariants({ variant, size }), className)}

@@ -24,8 +24,8 @@ export function Chat() {
   };
 
   return (
-    <Card className="flex flex-col h-64 lg:h-full">
-      <div className="flex-1 overflow-y-auto mb-4 space-y-2 pr-2">
+    <Card className="flex flex-col h-full min-h-0 max-h-full gap-4 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-2">
         {chatMessages.length === 0 ? (
           <p className="text-sm text-(--on-surface-variant) text-center mt-4">
             No messages yet. Say hello!
@@ -59,7 +59,7 @@ export function Chat() {
         <div ref={messagesEndRef} />
       </div>
       
-      <form onSubmit={handleSend} className="flex gap-2 mt-auto">
+      <form onSubmit={handleSend} className="flex gap-2">
         <Input 
           value={text}
           onChange={(e) => setText(e.target.value)}

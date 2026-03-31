@@ -78,15 +78,15 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
   setLobbyId: (id) => set({ lobbyId: id }),
   setIsConnected: (connected) => set({ isConnected: connected }),
   setError: (error) => set({ error }),
-  addParticipant: (id) => set((state) => ({ 
-    participants: state.participants.includes(id) ? state.participants : [...state.participants, id] 
+  addParticipant: (id) => set((state) => ({
+    participants: state.participants.includes(id) ? state.participants : [...state.participants, id]
   })),
   removeParticipant: (id) => set((state) => {
     const { [id]: _, ...rest } = state.remoteStreams;
     const { [id]: _streamMode, ...restStreamModesByPeer } = state.streamModesByPeer;
     const { [id]: _syncEvent, ...restSyncEventsByPeer } = state.syncEventsByPeer;
     const { [id]: _duration, ...restDurationsByPeer } = state.durationsByPeer;
-    return { 
+    return {
       participants: state.participants.filter((p) => p !== id),
       remoteStreams: rest,
       streamModesByPeer: restStreamModesByPeer,
@@ -391,7 +391,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
 
   const handleSignalingMessage = async (message: any) => {
     const { type, payload } = message;
-    
+
     switch (type) {
       case "peer_joined": {
         const { peer_id } = payload;
@@ -467,18 +467,18 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     useWebRTCStore.getState().setIsConnected(false);
 
     let reconnectTimer: NodeJS.Timeout;
-    
+
     const connect = () => {
       const baseWs = process.env.NEXT_PUBLIC_MONOLITH_STREAM_WS_URL?.replace(/\/$/, "");
       const wsUrl =
         baseWs != null && baseWs !== ""
           ? `${baseWs}/${lobbyId}`
           : (() => {
-              const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-              const host =
-                process.env.NEXT_PUBLIC_MONOLITH_STREAM_SIGNALING_HOST ?? "localhost:8084";
-              return `${protocol}//${host}/v1/stream/ws/${lobbyId}`;
-            })();
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const host =
+              process.env.NEXT_PUBLIC_MONOLITH_STREAM_SIGNALING_HOST ?? "localhost:8084";
+            return `${protocol}//${host}/v1/stream/ws/${lobbyId}`;
+          })();
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -509,7 +509,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
 
           for (let i = openingBraceIndex; i < rawData.length; i++) {
             const char = rawData[i];
-            
+
             if (escaped) {
               escaped = false;
               continue;
