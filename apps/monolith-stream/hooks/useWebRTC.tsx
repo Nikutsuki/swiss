@@ -14,6 +14,13 @@ interface SyncEvent {
 
 type StreamMode = "none" | "screen" | "file";
 
+export interface SubtitleTrack {
+  id: string;
+  label: string;
+  language: string;
+  content: string; // Raw WebVTT text
+}
+
 interface SyncRequest {
   action: "play" | "pause" | "seek";
   time: number;
@@ -44,6 +51,7 @@ interface WebRTCState {
   // Latest sync request received by the local peer (only meaningful if local peer is the streamer).
   incomingSyncRequest: SyncRequest | null;
   chatMessages: ChatMessage[];
+  subtitlesByPeer: Record<string, SubtitleTrack[]>;
   setPeerId: (id: string) => void;
   setLobbyId: (id: string | null) => void;
   setIsConnected: (connected: boolean) => void;
@@ -59,6 +67,7 @@ interface WebRTCState {
   addChatMessage: (msg: ChatMessage) => void;
   toggleTheaterMode: () => void;
   clearParticipants: () => void;
+  addSubtitleTrack: (peerId: string, track: SubtitleTrack) => void;
 }
 
 export const useWebRTCStore = create<WebRTCState>((set) => ({
@@ -74,6 +83,7 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
   durationsByPeer: {},
   incomingSyncRequest: null,
   chatMessages: [],
+  subtitlesByPeer: {},
   setPeerId: (id) => set({ peerId: id }),
   setLobbyId: (id) => set({ lobbyId: id }),
   setIsConnected: (connected) => set({ isConnected: connected }),
@@ -120,7 +130,15 @@ export const useWebRTCStore = create<WebRTCState>((set) => ({
       durationsByPeer: {},
       incomingSyncRequest: null,
       theaterMode: false,
+      subtitlesByPeer: {},
     }),
+  addSubtitleTrack: (peerId, track) =>
+    set((state) => ({
+      subtitlesByPeer: {
+        ...state.subtitlesByPeer,
+        [peerId]: [...(state.subtitlesByPeer[peerId] || []), track],
+      },
+    })),
 }));
 
 // --- Context for WebRTC actions ---
@@ -133,6 +151,7 @@ interface WebRTCContextValue {
   broadcastDuration: (duration: number) => void;
   sendSyncRequest: (targetPeerId: string, action: "play" | "pause" | "seek", time: number) => void;
   broadcastChatMessage: (text: string) => void;
+  broadcastSubtitle: (label: string, language: string, content: string) => void;
 }
 
 const WebRTCContext = createContext<WebRTCContextValue | null>(null);
@@ -175,6 +194,8 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
           ...msg.payload,
           senderId,
         });
+      } else if (msg.type === "subtitle") {
+        useWebRTCStore.getState().addSubtitleTrack(senderId, msg.payload as SubtitleTrack);
       }
     } catch (err) {
       console.error("Failed to parse data channel message", err);
@@ -694,6 +715,21 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const broadcastSubtitle = useCallback((label: string, language: string, content: string) => {
+    const payload: SubtitleTrack = {
+      id: crypto.randomUUID(),
+      label,
+      language,
+      content,
+    };
+    const myPeerId = useWebRTCStore.getState().peerId;
+
+    // Apply locally
+    useWebRTCStore.getState().addSubtitleTrack(myPeerId, payload);
+    // Broadcast to peers
+    broadcastDataMessage({ type: "subtitle", payload });
+  }, []);
+
   useEffect(() => {
     return () => {
       leaveLobby();
@@ -709,6 +745,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     broadcastDuration,
     sendSyncRequest,
     broadcastChatMessage,
+    broadcastSubtitle,
   }), [
     joinLobby,
     leaveLobby,
@@ -718,6 +755,7 @@ export const WebRTCProvider = ({ children }: { children: ReactNode }) => {
     broadcastDuration,
     sendSyncRequest,
     broadcastChatMessage,
+    broadcastSubtitle,
   ]);
 
   return (

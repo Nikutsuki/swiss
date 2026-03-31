@@ -2,8 +2,9 @@
 
 import { useRef } from "react";
 import { Button, Card, CardBody } from "@swiss/ui";
-import { MonitorUp, FileVideo, X } from "lucide-react";
+import { MonitorUp, FileVideo, X, Subtitles } from "lucide-react";
 import { useMediaStream } from "@/hooks/useMediaStream";
+import { useWebRTC } from "@/hooks/useWebRTC";
 
 export type StreamQuality = {
   resolution: "720p" | "1080p" | "2k";
@@ -20,6 +21,8 @@ interface StreamControlsProps {
 export function StreamControls({ onStreamReady, quality, onQualityChange }: StreamControlsProps) {
   const { startScreenShare, startLocalFile, stopStream, localStream, localVideoUrl, error } = useMediaStream();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const subtitleInputRef = useRef<HTMLInputElement>(null);
+  const { broadcastSubtitle } = useWebRTC();
   
   const activeType = localStream ? 'screen' : localVideoUrl ? 'file' : 'none';
 
@@ -59,6 +62,30 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
     onStreamReady(null, 'none');
   };
 
+  const handleSubtitleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const text = await file.text();
+        const baseName = file.name.endsWith(".vtt") ? file.name.slice(0, -4) : file.name;
+        const language = baseName.split("_").pop() || "en";
+        const label = baseName;
+
+        broadcastSubtitle(label, language, text);
+      } catch (err) {
+        console.error("Failed to read subtitle file:", err);
+      }
+    }
+
+    // Reset input so the same file can be uploaded again if needed
+    if (subtitleInputRef.current) {
+      subtitleInputRef.current.value = "";
+    }
+  };
+
   return (
     <Card>
       <CardBody className="flex gap-4 items-center !mt-0 py-2">
@@ -80,9 +107,24 @@ export function StreamControls({ onStreamReady, quality, onQualityChange }: Stre
             </Button>
           </>
         ) : (
-          <Button onClick={handleStop} variant="error" className="w-full" bold>
-            <X className="w-4 h-4 mr-2" /> Stop Streaming {activeType === 'screen' ? 'Screen' : 'File'}
-          </Button>
+          <>
+            <Button onClick={handleStop} variant="error" className="flex-1" bold>
+              <X className="w-4 h-4 mr-2" /> Stop {activeType === 'screen' ? 'Screen' : 'File'}
+            </Button>
+
+            {/* Subtitle Injection Control - Only visible when streaming */}
+            <input
+              type="file"
+              accept=".vtt"
+              className="hidden"
+              ref={subtitleInputRef}
+              onChange={handleSubtitleUpload}
+              multiple
+            />
+            <Button onClick={() => subtitleInputRef.current?.click()} variant="secondary" className="flex-none" bold>
+              <Subtitles className="w-4 h-4 mr-2" /> Add .VTT
+            </Button>
+          </>
         )}
       </CardBody>
       <CardBody className="flex flex-col gap-3 !mt-0 pt-0">

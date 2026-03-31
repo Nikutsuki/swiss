@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useWebRTCStore, useWebRTC } from "@/hooks/useWebRTC";
+import { useWebRTCStore, useWebRTC, type SubtitleTrack } from "@/hooks/useWebRTC";
 import { Card } from "@swiss/ui";
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Tv } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Tv, Subtitles } from "lucide-react";
 import type { StreamQuality } from "@/components/StreamControls";
 import { Rnd } from "react-rnd";
 
@@ -12,6 +12,75 @@ const formatTime = (seconds: number) => {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
+interface ParsedCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+const parseVttTime = (raw: string): number => {
+  const [hms, ms = "0"] = raw.split(".");
+  const parts = hms.split(":").map((p) => Number(p));
+  if (parts.length === 3) {
+    const [h, m, s] = parts;
+    return h * 3600 + m * 60 + s + Number(ms.padEnd(3, "0")) / 1000;
+  }
+  if (parts.length === 2) {
+    const [m, s] = parts;
+    return m * 60 + s + Number(ms.padEnd(3, "0")) / 1000;
+  }
+  return 0;
+};
+
+const parseWebVtt = (content: string): ParsedCue[] => {
+  const text = content.replace(/\r\n/g, "\n").trim();
+  const lines = text.split("\n");
+  const cues: ParsedCue[] = [];
+  let i = 0;
+
+  // Optional WEBVTT header
+  if (lines[i]?.startsWith("WEBVTT")) {
+    i++;
+    while (i < lines.length && lines[i].trim() === "") i++;
+  }
+
+  while (i < lines.length) {
+    // Optional cue identifier
+    if (lines[i] && !lines[i].includes("-->")) {
+      i++;
+    }
+    if (i >= lines.length) break;
+
+    const timingLine = lines[i];
+    const match = timingLine.match(
+      /([\d:.]+)\s*-->\s*([\d:.]+)/
+    );
+    if (!match) {
+      i++;
+      continue;
+    }
+    const start = parseVttTime(match[1]);
+    const end = parseVttTime(match[2]);
+    i++;
+
+    const textLines: string[] = [];
+    while (i < lines.length && lines[i].trim() !== "") {
+      textLines.push(lines[i]);
+      i++;
+    }
+
+    cues.push({
+      start,
+      end,
+      text: textLines.join("\n"),
+    });
+
+    while (i < lines.length && lines[i].trim() === "") i++;
+  }
+
+  return cues;
 };
 
 function FloatingVideoWrapper({
@@ -70,6 +139,9 @@ interface CustomControlsProps {
   onMuteToggle: () => void;
   onFullscreenToggle: () => void;
   onTheaterToggle: () => void;
+  subtitleOptions?: { id: string; label: string; language: string }[];
+  selectedSubtitleId?: string | null;
+  onSubtitleSelect?: (subtitleId: string | null) => void;
 }
 
 function CustomControls({
@@ -87,6 +159,9 @@ function CustomControls({
   onMuteToggle,
   onFullscreenToggle,
   onTheaterToggle,
+  subtitleOptions = [],
+  selectedSubtitleId = null,
+  onSubtitleSelect,
 }: CustomControlsProps) {
   const [localTime, setLocalTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -172,6 +247,25 @@ function CustomControls({
       {isLiveStream && <div className="flex-1" />}
 
       <div className="flex items-center gap-3 ml-2 border-l border-white/20 pl-3">
+        {subtitleOptions.length > 0 && onSubtitleSelect && (
+          <div className="flex items-center gap-2">
+            <Subtitles className="w-4 h-4 text-white/80" />
+            <select
+              value={selectedSubtitleId ?? ""}
+              onChange={(e) => onSubtitleSelect(e.target.value || null)}
+              className="bg-black/40 border border-white/20 rounded px-2 py-1 text-xs text-white"
+              aria-label="Select subtitle track"
+            >
+              <option value="">Off</option>
+              {subtitleOptions.map((subtitle) => (
+                <option key={subtitle.id} value={subtitle.id}>
+                  {subtitle.label} ({subtitle.language})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 group/volume">
           <button onClick={onMuteToggle} className="text-white hover:text-[#52c488] transition-colors" type="button">
             {isMuted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
@@ -216,6 +310,7 @@ interface VideoViewProps {
   syncEvent?: any;
   isLiveStream?: boolean;
   isLocal?: boolean;
+  subtitles?: SubtitleTrack[];
   // Native DOM events (Streamer uses these to trigger network broadcasts)
   onPlayNative?: (time: number) => void;
   onPauseNative?: (time: number) => void;
@@ -237,6 +332,7 @@ function VideoView({
   syncEvent,
   isLiveStream = false,
   isLocal = false,
+  subtitles = [],
   onPlayNative,
   onPauseNative,
   onSeekedNative,
@@ -264,13 +360,58 @@ function VideoView({
   const [volume, setVolume] = useState(1);
   const [isLocalMuted, setIsLocalMuted] = useState(muted);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [subtitleFontSizePx, setSubtitleFontSizePx] = useState(48);
   const { theaterMode, toggleTheaterMode } = useWebRTCStore();
+  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
+  const [parsedSubtitles, setParsedSubtitles] = useState<Record<string, ParsedCue[]>>({});
+  const [activeCueText, setActiveCueText] = useState<string>("");
 
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSubtitleSize = () => {
+      const { width, height } = container.getBoundingClientRect();
+      const base = Math.min(width, height);
+      const size = Math.max(18, Math.min(64, Math.round(base * 0.08)));
+      setSubtitleFontSizePx(size);
+    };
+
+    updateSubtitleSize();
+    const observer = new ResizeObserver(updateSubtitleSize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!subtitles.length) {
+      setParsedSubtitles({});
+      setSelectedSubtitleId(null);
+      setActiveCueText("");
+      return;
+    }
+
+    const parsed: Record<string, ParsedCue[]> = {};
+    subtitles.forEach((sub) => {
+      parsed[sub.id] = parseWebVtt(sub.content);
+    });
+    setParsedSubtitles(parsed);
+
+    if (!selectedSubtitleId || !parsed[selectedSubtitleId]) {
+      setSelectedSubtitleId(subtitles[0]?.id ?? null);
+      setActiveCueText("");
+    }
+  }, [subtitles]);
+
+  useEffect(() => {
+    setActiveCueText("");
+  }, [selectedSubtitleId]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -286,6 +427,39 @@ function VideoView({
       videoRef.current.muted = isLocalMuted;
     }
   }, [volume, isLocalMuted]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    let frame = 0;
+    const tick = () => {
+      const cues = selectedSubtitleId ? parsedSubtitles[selectedSubtitleId] : undefined;
+      if (!cues || !cues.length) {
+        setActiveCueText("");
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+
+      // For file mode, use the synced timeline (seek/play/pause) instead of MediaStream currentTime.
+      // This avoids desync when playback is driven by a headless source + captured stream.
+      let subtitleTime = video.currentTime;
+      if (!isLiveStream && syncEvent) {
+        if (syncEvent.action === "play") {
+          subtitleTime = syncEvent.time + Math.max(0, (Date.now() - syncEvent.timestamp) / 1000);
+        } else {
+          subtitleTime = syncEvent.time;
+        }
+      }
+
+      const active = cues.find((cue) => subtitleTime >= cue.start && subtitleTime <= cue.end) ?? null;
+      setActiveCueText(active ? active.text : "");
+      frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [parsedSubtitles, selectedSubtitleId, syncEvent, isLiveStream]);
 
   // Handle Stream vs File Source
   useEffect(() => {
@@ -354,10 +528,24 @@ function VideoView({
         muted={isLocalMuted}
         onLoadedMetadata={isLocal ? onLoadedMetadataNative : undefined}
         className={`w-full h-full object-contain ${!isLocal ? "pointer-events-none" : ""}`}
+        crossOrigin="anonymous"
       />
       {!isFullscreen && (
         <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
           {label}
+        </div>
+      )}
+      {activeCueText && (
+        <div
+          className="absolute antialiased bottom-16 left-1/2 -translate-x-1/2 px-3 py-2 rounded font-semibold text-white text-center whitespace-pre-line w-full pointer-events-none"
+          style={{
+            fontSize: `${subtitleFontSizePx}px`,
+            lineHeight: 1.2,
+            textShadow:
+              "-2px -2px 0 #000, 0 -2px 0 #000, 2px -2px 0 #000, 2px 0 0 #000, 2px 2px 0 #000, 0 2px 0 #000, -2px 2px 0 #000, -2px 0 0 #000, 0 0 10px rgba(0,0,0,0.9)",
+          }}
+        >
+          {activeCueText}
         </div>
       )}
       {autoplayBlocked && (
@@ -393,6 +581,13 @@ function VideoView({
         onPlay={!isLiveStream ? handleUiPlay : undefined}
         onPause={!isLiveStream ? handleUiPause : undefined}
         onSeek={!isLiveStream ? handleUiSeek : undefined}
+        subtitleOptions={subtitles.map((s) => ({
+          id: s.id,
+          label: s.label,
+          language: s.language,
+        }))}
+        selectedSubtitleId={selectedSubtitleId}
+        onSubtitleSelect={setSelectedSubtitleId}
       />
     </div>
   );
@@ -417,6 +612,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
     streamModesByPeer,
     durationsByPeer,
     incomingSyncRequest,
+    subtitlesByPeer,
     setIncomingSyncRequest,
   } = useWebRTCStore();
   const { broadcastSyncEvent, broadcastStream, broadcastStreamMode, sendSyncRequest, broadcastDuration } = useWebRTC();
@@ -651,6 +847,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
               isLocal={true}
               duration={durationsByPeer[peerId]}
               syncEvent={syncEventsByPeer[peerId]}
+              subtitles={subtitlesByPeer[peerId] || []}
               onPlayNative={handleLocalUiPlay}
               onPauseNative={handleLocalUiPause}
               onSeekedNative={handleLocalUiSeek}
@@ -668,6 +865,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
                 isLocal={false}
                 duration={durationsByPeer[peerId]}
                 syncEvent={syncEventsByPeer[peerId]}
+                subtitles={subtitlesByPeer[peerId] || []}
                 remotePlayRequest={(time: number) => handleRemotePlay(peerId, time)}
                 remotePauseRequest={(time: number) => handleRemotePause(peerId, time)}
                 remoteSeekRequest={(time: number) => handleRemoteSeeked(peerId, time)}
@@ -701,6 +899,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
                 isLocal={true}
                 duration={durationsByPeer[peerId]}
                 syncEvent={syncEventsByPeer[peerId]}
+                subtitles={subtitlesByPeer[peerId] || []}
                 onPlayNative={handleLocalUiPlay}
                 onPauseNative={handleLocalUiPause}
                 onSeekedNative={handleLocalUiSeek}
@@ -721,6 +920,7 @@ export function VideoPlayer({ localStream, localVideoUrl, quality }: VideoPlayer
                   isLocal={false}
                   duration={durationsByPeer[peerId]}
                   syncEvent={syncEventsByPeer[peerId]}
+                  subtitles={subtitlesByPeer[peerId] || []}
                   remotePlayRequest={(time: number) => handleRemotePlay(peerId, time)}
                   remotePauseRequest={(time: number) => handleRemotePause(peerId, time)}
                   remoteSeekRequest={(time: number) => handleRemoteSeeked(peerId, time)}
