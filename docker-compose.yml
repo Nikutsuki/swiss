@@ -1,0 +1,128 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-secretpassword}
+      POSTGRES_DB: utils_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d utils_db"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@nikutsuki.top}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-2f9d938a2dde1593}
+    ports:
+      - "8085:80"
+    depends_on:
+      - postgres
+    networks:
+      - default
+      - edge-proxy-network
+
+  auth-api:
+    image: golang:1.26-bookworm
+    working_dir: /src
+    volumes:
+      - .:/src
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://root:${DATABASE_PASSWORD:-secretpassword}@postgres:5432/utils_db?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-insecure-change-me}
+      AUTH_HTTP_ADDR: ${AUTH_HTTP_ADDR:-:8080}
+    command: go run ./services/auth-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  monolith-api:
+    image: golang:1.26-bookworm
+    working_dir: /src
+    volumes:
+      - .:/src
+    ports:
+      - "8081:8081"
+    environment:
+      DATABASE_URL: postgresql://root:${DATABASE_PASSWORD:-secretpassword}@postgres:5432/utils_db?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-insecure-change-me}
+      MONOLITH_HTTP_ADDR: ${MONOLITH_HTTP_ADDR:-:8081}
+    command: go run ./services/monolith-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  signaling-api:
+    image: golang:1.26-bookworm
+    working_dir: /src
+    volumes:
+      - .:/src
+    ports:
+      - "8083:8083"
+    environment:
+      SIGNALING_HTTP_ADDR: ":8083"
+      SIGNALING_ALLOWED_ORIGINS: ${SIGNALING_ALLOWED_ORIGINS:-}
+    command: go run ./services/signaling-api
+
+  monolith-drop-api:
+    image: golang:1.26-bookworm
+    working_dir: /src
+    volumes:
+      - .:/src
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: postgresql://root:${DATABASE_PASSWORD:-secretpassword}@postgres:5432/utils_db?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-insecure-change-me}
+      MONOLITH_DROP_HTTP_ADDR: ${MONOLITH_DROP_HTTP_ADDR:-:8082}
+      MONOLITH_DROP_CORS_ORIGINS: ${MONOLITH_DROP_CORS_ORIGINS:-}
+    command: go run ./services/monolith-drop-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  fiszki-api:
+    image: golang:1.26-bookworm
+    working_dir: /src
+    volumes:
+      - .:/src
+    ports:
+      - "8085:8085"
+    environment:
+      DATABASE_URL: postgresql://root:secretpassword@postgres:5432/utils_db?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-insecure-change-me}
+      FISZKI_HTTP_ADDR: ${FISZKI_HTTP_ADDR:-:8085}
+    command: go run ./services/fiszki-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  monolith-stream-api:
+    image: golang:1.26-bookworm
+    working_dir: /src
+    volumes:
+      - .:/src
+    ports:
+      - "8084:8084"
+    environment:
+      MONOLITH_STREAM_HTTP_ADDR: ${MONOLITH_STREAM_HTTP_ADDR:-:8084}
+      MONOLITH_STREAM_CORS_ORIGINS: ${MONOLITH_STREAM_CORS_ORIGINS:-}
+    command: go run ./services/monolith-stream-api
+    networks:
+      - default
+      - edge-proxy-network
+
+networks:
+  edge-proxy-network:
+    external: true
+
+volumes:
+  pgdata:

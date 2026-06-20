@@ -1,0 +1,6 @@
+{
+  "name": "@swiss/db",
+  "scripts": {
+    "generate": "sqlc generate"
+  }
+}

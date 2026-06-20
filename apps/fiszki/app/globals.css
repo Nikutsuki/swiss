@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@source "../../../packages/ui";
+@import "@swiss/ui/styles.css";
+
+.fiszki-card-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.fiszki-card-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.9s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.fiszki-card-inner.flipped {
+  transform: rotateY(180deg);
+}

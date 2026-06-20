@@ -1,0 +1,308 @@
+name: swiss-app
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    networks:
+      - swiss-internal
+
+  auth-api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/go-service.Dockerfile
+      args:
+        SERVICE_DIR: services/auth-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      AUTH_HTTP_ADDR: :8080
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
+      WEBAUTHN_RP_ORIGINS: ${WEBAUTHN_RP_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  monolith-api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/go-service.Dockerfile
+      args:
+        SERVICE_DIR: services/monolith-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      MONOLITH_HTTP_ADDR: :8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  monolith-drop-api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/go-service.Dockerfile
+      args:
+        SERVICE_DIR: services/monolith-drop-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      MONOLITH_DROP_HTTP_ADDR: :8082
+      MONOLITH_DROP_CORS_ORIGINS: ${MONOLITH_DROP_CORS_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  fiszki-api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/go-service.Dockerfile
+      args:
+        SERVICE_DIR: services/fiszki-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      FISZKI_HTTP_ADDR: :8085
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  monolith-stream-api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/go-service.Dockerfile
+      args:
+        SERVICE_DIR: services/monolith-stream-api
+    restart: unless-stopped
+    environment:
+      MONOLITH_STREAM_HTTP_ADDR: :8084
+      MONOLITH_STREAM_CORS_ORIGINS: ${MONOLITH_STREAM_CORS_ORIGINS}
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  signaling-api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/go-service.Dockerfile
+      args:
+        SERVICE_DIR: services/signaling-api
+    restart: unless-stopped
+    environment:
+      SIGNALING_HTTP_ADDR: :8083
+      SIGNALING_ALLOWED_ORIGINS: ${SIGNALING_ALLOWED_ORIGINS}
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  auth-portal:
+    build:
+      context: ..
+      dockerfile: deploy/docker/next-app.Dockerfile
+      args:
+        APP_DIR: apps/auth-portal
+        APP_NAME: auth-portal
+        AUTH_API_ORIGIN: ${AUTH_API_ORIGIN}
+        NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+        NEXT_PUBLIC_MONOLITH_URL: ${NEXT_PUBLIC_MONOLITH_URL}
+        NEXT_PUBLIC_MONOLITH_DROP_URL: ${NEXT_PUBLIC_MONOLITH_DROP_URL}
+        NEXT_PUBLIC_MONOLITH_STREAM_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_URL}
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+      NEXT_PUBLIC_MONOLITH_URL: ${NEXT_PUBLIC_MONOLITH_URL}
+      NEXT_PUBLIC_MONOLITH_DROP_URL: ${NEXT_PUBLIC_MONOLITH_DROP_URL}
+      NEXT_PUBLIC_MONOLITH_STREAM_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_URL}
+      AUTH_API_ORIGIN: ${AUTH_API_ORIGIN}
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  monolith:
+    build:
+      context: ..
+      dockerfile: deploy/docker/next-app.Dockerfile
+      args:
+        APP_DIR: apps/monolith
+        APP_NAME: monolith
+        AUTH_API_ORIGIN: ${AUTH_API_ORIGIN}
+        MONOLITH_API_ORIGIN: ${MONOLITH_API_ORIGIN}
+        NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+        NEXT_PUBLIC_MONOLITH_URL: ${NEXT_PUBLIC_MONOLITH_URL}
+        NEXT_PUBLIC_MONOLITH_DROP_URL: ${NEXT_PUBLIC_MONOLITH_DROP_URL}
+        NEXT_PUBLIC_MONOLITH_STREAM_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_URL}
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+      NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+      NEXT_PUBLIC_MONOLITH_URL: ${NEXT_PUBLIC_MONOLITH_URL}
+      NEXT_PUBLIC_MONOLITH_DROP_URL: ${NEXT_PUBLIC_MONOLITH_DROP_URL}
+      NEXT_PUBLIC_MONOLITH_STREAM_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_URL}
+      AUTH_API_ORIGIN: ${AUTH_API_ORIGIN}
+      MONOLITH_API_ORIGIN: ${MONOLITH_API_ORIGIN}
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  monolith-drop:
+    build:
+      context: ..
+      dockerfile: deploy/docker/next-app.Dockerfile
+      args:
+        APP_DIR: apps/monolith-drop
+        APP_NAME: monolith-drop
+        MONOLITH_DROP_API_ORIGIN: ${MONOLITH_DROP_API_ORIGIN}
+        NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+        NEXT_PUBLIC_MONOLITH_URL: ${NEXT_PUBLIC_MONOLITH_URL}
+        NEXT_PUBLIC_MONOLITH_DROP_URL: ${NEXT_PUBLIC_MONOLITH_DROP_URL}
+        NEXT_PUBLIC_MONOLITH_STREAM_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_URL}
+        NEXT_PUBLIC_SIGNALING_WS_URL: ${NEXT_PUBLIC_SIGNALING_WS_URL}
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      NODE_ENV: production
+      NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+      NEXT_PUBLIC_MONOLITH_URL: ${NEXT_PUBLIC_MONOLITH_URL}
+      NEXT_PUBLIC_MONOLITH_DROP_URL: ${NEXT_PUBLIC_MONOLITH_DROP_URL}
+      NEXT_PUBLIC_MONOLITH_STREAM_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_URL}
+      MONOLITH_DROP_API_ORIGIN: ${MONOLITH_DROP_API_ORIGIN}
+      NEXT_PUBLIC_SIGNALING_WS_URL: ${NEXT_PUBLIC_SIGNALING_WS_URL}
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  monolith-stream:
+    build:
+      context: ..
+      dockerfile: deploy/docker/next-app.Dockerfile
+      args:
+        APP_DIR: apps/monolith-stream
+        APP_NAME: monolith-stream
+        MONOLITH_STREAM_API_ORIGIN: ${MONOLITH_STREAM_API_ORIGIN}
+        NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+        NEXT_PUBLIC_MONOLITH_URL: ${NEXT_PUBLIC_MONOLITH_URL}
+        NEXT_PUBLIC_MONOLITH_DROP_URL: ${NEXT_PUBLIC_MONOLITH_DROP_URL}
+        NEXT_PUBLIC_MONOLITH_STREAM_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_URL}
+        NEXT_PUBLIC_MONOLITH_STREAM_WS_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_WS_URL}
+        NEXT_PUBLIC_MONOLITH_STREAM_SIGNALING_HOST: ${NEXT_PUBLIC_MONOLITH_STREAM_SIGNALING_HOST}
+    restart: unless-stopped
+    environment:
+      PORT: 3003
+      NODE_ENV: production
+      NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+      NEXT_PUBLIC_MONOLITH_URL: ${NEXT_PUBLIC_MONOLITH_URL}
+      NEXT_PUBLIC_MONOLITH_DROP_URL: ${NEXT_PUBLIC_MONOLITH_DROP_URL}
+      NEXT_PUBLIC_MONOLITH_STREAM_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_URL}
+      MONOLITH_STREAM_API_ORIGIN: ${MONOLITH_STREAM_API_ORIGIN}
+      NEXT_PUBLIC_MONOLITH_STREAM_WS_URL: ${NEXT_PUBLIC_MONOLITH_STREAM_WS_URL}
+      NEXT_PUBLIC_MONOLITH_STREAM_SIGNALING_HOST: ${NEXT_PUBLIC_MONOLITH_STREAM_SIGNALING_HOST}
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  fiszki:
+    build:
+      context: ..
+      dockerfile: deploy/docker/next-app.Dockerfile
+      args:
+        APP_DIR: apps/fiszki
+        APP_NAME: fiszki
+        AUTH_API_ORIGIN: ${AUTH_API_ORIGIN}
+        FISZKI_API_ORIGIN: ${FISZKI_API_ORIGIN}
+        NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+        NEXT_PUBLIC_FISZKI_URL: ${NEXT_PUBLIC_FISZKI_URL}
+    restart: unless-stopped
+    environment:
+      PORT: 3005
+      NODE_ENV: production
+      NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+      NEXT_PUBLIC_FISZKI_URL: ${NEXT_PUBLIC_FISZKI_URL}
+      AUTH_API_ORIGIN: ${AUTH_API_ORIGIN}
+      FISZKI_API_ORIGIN: ${FISZKI_API_ORIGIN}
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  personal-website:
+    build:
+      context: ..
+      dockerfile: deploy/docker/next-app.Dockerfile
+      args:
+        APP_DIR: apps/personal-website
+        APP_NAME: personal-website
+    restart: unless-stopped
+    environment:
+      PORT: 3004
+      NODE_ENV: production
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    networks:
+      - swiss-internal
+      - edge-proxy-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+
+networks:
+  swiss-internal:
+    name: swiss-internal
+    driver: bridge
+  edge-proxy-network:
+    external: true

@@ -1,0 +1,7 @@
+{
+  "name": "@swiss/fiszki-api",
+  "private": true,
+  "scripts": {
+    "build": "go build -o dist/fiszki-api ."
+  }
+}

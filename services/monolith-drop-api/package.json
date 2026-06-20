@@ -1,0 +1,7 @@
+{
+  "name": "@swiss/monolith-drop-api",
+  "private": true,
+  "scripts": {
+    "build": "go build -o dist/monolith-drop-api ."
+  }
+}

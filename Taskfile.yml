@@ -1,0 +1,148 @@
+version: "3"
+
+dotenv: [".env"]
+
+tasks:
+  db:up:
+    desc: "Starts only the PostgreSQL container (lightweight local DB)"
+    cmds:
+      - docker compose up -d postgres
+
+  db:wait:
+    desc: "Waits until Postgres accepts connections (requires db:up)"
+    deps: [db:up]
+    cmds:
+      - >-
+        until docker compose exec -T postgres pg_isready -U root -d utils_db;
+        do sleep 1; done
+      - sleep 2
+
+  db:down:
+    desc: "Stops and removes all Compose services (Postgres and APIs if running)"
+    cmds:
+      - docker compose down
+
+  stack:up:
+    desc: "Starts Postgres plus auth-api and monolith-api (full backend stack)"
+    cmds:
+      - docker compose up -d
+
+  stack:down:
+    desc: "Stops the full Compose stack"
+    cmds:
+      - docker compose down
+
+  db:clear:
+    desc: "Clears PostgreSQL data by removing the DB volume and restarting Postgres only"
+    cmds:
+      - docker compose down -v
+      - docker compose up -d postgres
+
+  db:generate:
+    desc: "Generates type-safe Go code from SQL schema and queries"
+    cmds:
+      - sqlc generate
+
+  migrate:up:
+    desc: "Applies all pending database migrations"
+    deps: [db:wait]
+    cmds:
+      - migrate -path schema/migrations -database "${DATABASE_URL}" -verbose up
+    requires:
+      vars: [DATABASE_URL]
+
+  migrate:down:
+    desc: "Reverts the most recent database migration"
+    cmds:
+      - migrate -path schema/migrations -database "${DATABASE_URL}" -verbose down 1
+    requires:
+      vars: [DATABASE_URL]
+
+  migrate:create:
+    desc: "Generates a new sequential migration file pair"
+    cmds:
+      - migrate create -ext sql -dir schema/migrations -seq {{.CLI_ARGS}}
+  api:dev:
+    desc: "Executes the Golang Authentication API (:8080); uses DATABASE_URL and JWT_SECRET from repo .env"
+    deps: [migrate:up]
+    dir: services/auth-api
+    cmds:
+      - go run .
+
+  monolith-api:dev:
+    desc: "Runs the Monolith E2EE API (:8081); uses DATABASE_URL and JWT_SECRET from repo .env"
+    deps: [migrate:up]
+    dir: services/monolith-api
+    cmds:
+      - go run .
+
+  monolith-drop-api:dev:
+    desc: "Runs the Monolith Drop P2P session API (:8082); required for monolith-drop file sessions"
+    deps: [migrate:up]
+    dir: services/monolith-drop-api
+    cmds:
+      - go run .
+
+  signaling-api:dev:
+    desc: "Runs the WebRTC signaling WebSocket router (:8083); SIGNALING_ALLOWED_ORIGINS optional"
+    dir: services/signaling-api
+    cmds:
+      - go run .
+
+  monolith-stream-api:dev:
+    desc: "Runs the Monolith Stream HTTP API (:8084); MONOLITH_STREAM_CORS_ORIGINS optional"
+    dir: services/monolith-stream-api
+    cmds:
+      - go run .
+
+  fiszki-api:dev:
+    desc: "Runs the Fiszki study sets API (:8085); uses DATABASE_URL and JWT_SECRET from repo .env"
+    deps: [migrate:up]
+    dir: services/fiszki-api
+    cmds:
+      - go run .
+
+  turbo:dev:
+    desc: "Runs Next apps only. For Drop WebRTC also run monolith-drop-api:dev (:8082) and signaling-api:dev (:8083); for stream, monolith-stream-api:dev (:8084)."
+    deps: [migrate:up, types:sync]
+    cmds:
+      - pnpm turbo dev --parallel --filter monolith --filter auth-portal --filter monolith-drop --filter monolith-stream --filter personal-website --filter fiszki
+
+  web:dev:
+    desc: "Executes the Next.js monolith only"
+    dir: apps/monolith
+    cmds:
+      - pnpm run dev
+
+  monolith-stream:web:dev:
+    desc: "Executes the monolith-stream Next app only (:3003 HTTPS or run dev:http for plain HTTP)"
+    dir: apps/monolith-stream
+    cmds:
+      - pnpm run dev
+
+  personal-website:web:dev:
+    desc: "Executes the personal-website Next app only (:3004 HTTPS or run dev:http for plain HTTP)"
+    dir: apps/personal-website
+    cmds:
+      - pnpm run dev
+
+  types:sync:
+    desc: "Parses Go AST and emits TypeScript for each app / package (see per-service tygo.yaml)"
+    cmds:
+      - cd services/monolith-api && tygo generate --config tygo.yaml
+      - cd services/auth-api && tygo generate --config tygo.yaml
+      - cd services/monolith-drop-api && tygo generate --config tygo.yaml
+      - cd services/signaling-api && tygo generate --config tygo.yaml
+      - cd services/monolith-stream-api && tygo generate --config tygo.yaml
+      - cd services/fiszki-api && tygo generate --config tygo.yaml
+
+  dev:
+    desc: "Full stack from repo .env — Postgres, migrations, auth-api :8080, monolith-api :8081, Turbo dev (all apps)"
+    deps:
+      - api:dev
+      - monolith-api:dev
+      - monolith-drop-api:dev
+      - signaling-api:dev
+      - monolith-stream-api:dev
+      - fiszki-api:dev
+      - turbo:dev

@@ -1,0 +1,6 @@
+packages:
+  - path: "github.com/Nikutsuki/swiss/services/fiszki-api/models"
+    output_path: "../../apps/fiszki/src/types/backend.d.ts"
+    type_mappings:
+      "time.Time": "string"
+      "uuid.UUID": "string"

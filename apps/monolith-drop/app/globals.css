@@ -1,0 +1,34 @@
+@import "tailwindcss";
+@source "../../../packages/ui";
+@import "@swiss/ui/styles.css";
+
+.drop-burn-progress {
+  height: 2px;
+  background: var(--security-emerald);
+  box-shadow: 0 0 10px rgb(93 221 161 / 40%);
+}
+
+.drop-glass-blur {
+  backdrop-filter: blur(20px);
+  background: rgb(42 42 42 / 60%);
+}
+
+.drop-scan-line {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgb(93 221 161 / 10%) 50%,
+    transparent 100%
+  );
+  background-size: 100% 4px;
+  animation: drop-scan 10s linear infinite;
+}
+
+@keyframes drop-scan {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 100%;
+  }
+}

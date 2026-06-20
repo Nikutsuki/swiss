@@ -1,0 +1,56 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NEXT_PUBLIC_AUTH_URL",
+    "NEXT_PUBLIC_ROOT_DOMAIN",
+    "NEXT_PUBLIC_MONOLITH_URL",
+    "NEXT_PUBLIC_MONOLITH_DROP_URL",
+    "NEXT_PUBLIC_MONOLITH_STREAM_URL",
+    "NEXT_PUBLIC_MONOLITH_STREAM_WS_URL",
+    "NEXT_PUBLIC_MONOLITH_STREAM_SIGNALING_HOST",
+    "PORT",
+    "COOKIE_SECURE",
+    "JWT_SECRET",
+    "AUTH_API_ORIGIN",
+    "AUTH_HTTP_ADDR",
+    "MONOLITH_API_ORIGIN",
+    "MONOLITH_HTTP_ADDR",
+    "MONOLITH_DROP_API_ORIGIN",
+    "MONOLITH_DROP_HTTP_ADDR",
+    "MONOLITH_STREAM_API_ORIGIN",
+    "MONOLITH_STREAM_HTTP_ADDR",
+    "MONOLITH_STREAM_CORS_ORIGINS",
+    "NEXT_PUBLIC_FISZKI_URL",
+    "FISZKI_API_ORIGIN",
+    "FISZKI_HTTP_ADDR",
+    "NEXT_PUBLIC_SIGNALING_WS_URL",
+    "SIGNALING_HTTP_ADDR",
+    "SIGNALING_ALLOWED_ORIGINS"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "dist/**"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": [
+        "^lint"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^test"
+      ],
+      "cache": true
+    }
+  }
+}
