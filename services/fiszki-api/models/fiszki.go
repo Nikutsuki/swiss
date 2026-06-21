@@ -7,6 +7,7 @@ type QuestionInput struct {
 	Answer         string   `json:"answer,omitempty"`
 	Choices        []string `json:"choices,omitempty"`
 	CorrectIndices []int    `json:"correct_indices,omitempty"`
+	ImagePath      string   `json:"image_path,omitempty"`
 }
 
 // CreateStudySetRequest is the JSON body for POST /sets.
@@ -46,6 +47,7 @@ type QuestionResponse struct {
 	Answer         string   `json:"answer,omitempty"`
 	Choices        []string `json:"choices,omitempty"`
 	CorrectIndices []int    `json:"correct_indices,omitempty"`
+	ImagePath      string   `json:"image_path,omitempty"`
 }
 
 // CardProgressResponse is per-card spaced-repetition state inside GET /sets/{id}.

@@ -60,6 +60,17 @@ export default function StudySetsWorkspace() {
     setName((current) => current || file.name.replace(/\.csv$/i, ""));
   }, []);
 
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+
+  const closeCreating = useCallback(() => {
+    setCreating(false);
+    setName("");
+    setDescription("");
+    setCsvText("");
+    setSelectedImages([]);
+    setCreateError(null);
+  }, []);
+
   const createSet = useCallback(async () => {
     if (busy) return;
     setCreateError(null);
@@ -73,25 +84,26 @@ export default function StudySetsWorkspace() {
     }
     setBusy(true);
     try {
+      const formData = new FormData();
+      formData.append("name", name.trim());
+      formData.append("description", description.trim());
+      formData.append("questions", JSON.stringify(parsed.questions));
+      selectedImages.forEach((img) => {
+        formData.append("images", img);
+      });
+
       await fetchJson<CreateStudySetResponse>("/api/fiszki/sets", {
         method: "POST",
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim(),
-          questions: parsed.questions,
-        }),
+        body: formData,
       });
-      setCreating(false);
-      setName("");
-      setDescription("");
-      setCsvText("");
+      closeCreating();
       await loadSets();
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : "Failed to create study set.");
     } finally {
       setBusy(false);
     }
-  }, [busy, name, description, parsed.questions, loadSets]);
+  }, [busy, name, description, parsed.questions, selectedImages, loadSets, closeCreating]);
 
   const deleteSet = useCallback(
     async (set: StudySetSummary) => {
@@ -199,7 +211,7 @@ export default function StudySetsWorkspace() {
         ))}
       </div>
 
-      <Modal isOpen={creating} onClose={() => setCreating(false)} className="w-full max-w-2xl">
+      <Modal isOpen={creating} onClose={closeCreating} className="w-full max-w-2xl">
         <div className="flex flex-col gap-4">
           <h2 className="text-2xl font-bold">Import Study Set</h2>
           <Input
@@ -215,17 +227,37 @@ export default function StudySetsWorkspace() {
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What this set covers"
           />
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium" htmlFor="fiszki-csv-file">
-              CSV file
-            </label>
-            <input
-              id="fiszki-csv-file"
-              type="file"
-              accept=".csv,text/csv,text/plain"
-              className="text-sm text-(--on-surface-variant) file:mr-3 file:cursor-pointer file:border-0 file:bg-(--on-surface) file:px-3 file:py-1.5 file:text-xs file:font-bold file:uppercase file:tracking-widest file:text-(--on-primary)"
-              onChange={(e) => void onCsvFile(e.target.files?.[0])}
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium" htmlFor="fiszki-csv-file">
+                CSV file
+              </label>
+              <input
+                id="fiszki-csv-file"
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                className="text-sm text-(--on-surface-variant) file:mr-3 file:cursor-pointer file:border-0 file:bg-(--on-surface) file:px-3 file:py-1.5 file:text-xs file:font-bold file:uppercase file:tracking-widest file:text-(--on-primary)"
+                onChange={(e) => void onCsvFile(e.target.files?.[0])}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium" htmlFor="fiszki-image-files">
+                Images (optional, e.g. 1.png, 2.jpg)
+              </label>
+              <input
+                id="fiszki-image-files"
+                type="file"
+                multiple
+                accept="image/*"
+                className="text-sm text-(--on-surface-variant) file:mr-3 file:cursor-pointer file:border-0 file:bg-(--on-surface) file:px-3 file:py-1.5 file:text-xs file:font-bold file:uppercase file:tracking-widest file:text-(--on-primary)"
+                onChange={(e) => setSelectedImages(Array.from(e.target.files || []))}
+              />
+              {selectedImages.length > 0 ? (
+                <span className="text-xs text-(--on-surface-variant)">
+                  {selectedImages.length} image{selectedImages.length === 1 ? "" : "s"} selected
+                </span>
+              ) : null}
+            </div>
           </div>
           <Textarea
             title="Or paste CSV content"
@@ -248,7 +280,7 @@ export default function StudySetsWorkspace() {
           ) : null}
           {createError ? <p className="text-sm text-red-400">{createError}</p> : null}
           <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setCreating(false)} disabled={busy}>
+            <Button variant="secondary" onClick={closeCreating} disabled={busy}>
               Cancel
             </Button>
             <Button onClick={() => void createSet()} disabled={busy}>

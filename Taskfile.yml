@@ -12,10 +12,7 @@ tasks:
     desc: "Waits until Postgres accepts connections (requires db:up)"
     deps: [db:up]
     cmds:
-      - >-
-        until docker compose exec -T postgres pg_isready -U root -d utils_db;
-        do sleep 1; done
-      - sleep 2
+      - node ./scripts/wait-for-postgres.mjs
 
   db:down:
     desc: "Stops and removes all Compose services (Postgres and APIs if running)"

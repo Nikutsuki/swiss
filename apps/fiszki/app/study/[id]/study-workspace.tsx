@@ -24,6 +24,7 @@ function isDueForReview(progress: CardProgressResponse | undefined, now: number)
 
 export default function StudyWorkspace({ setId }: { setId: string }) {
   const router = useRouter();
+  const [mountedNow] = useState(() => Date.now());
   const [detail, setDetail] = useState<StudySetDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -73,9 +74,9 @@ export default function StudyWorkspace({ setId }: { setId: string }) {
   );
   const unknownOrNewCount = flashcardQuestions.length - knownCount;
   const dueCount = useMemo(() => {
-    const now = Date.now();
+    const now = mountedNow;
     return flashcardQuestions.filter((q) => isDueForReview(progressByQuestion.get(q.id), now)).length;
-  }, [flashcardQuestions, progressByQuestion]);
+  }, [flashcardQuestions, progressByQuestion, mountedNow]);
 
   const applyLimit = useCallback(
     <T,>(items: T[]): T[] => {
@@ -116,6 +117,7 @@ export default function StudyWorkspace({ setId }: { setId: string }) {
         prompt: q.prompt,
         answer: q.answer ?? "",
         progress: progressByQuestion.get(q.id),
+        imagePath: q.image_path,
       })),
     );
     setStartedAt(new Date().toISOString());
@@ -144,6 +146,7 @@ export default function StudyWorkspace({ setId }: { setId: string }) {
           choices,
           correctIndices,
           originalIndices: order,
+          imagePath: q.image_path,
         };
       }),
     );
@@ -350,7 +353,7 @@ export default function StudyWorkspace({ setId }: { setId: string }) {
                 <TableBody>
                   {flashcardQuestions.map((q) => {
                     const p = progressByQuestion.get(q.id);
-                    const due = isDueForReview(p, Date.now());
+                    const due = isDueForReview(p, mountedNow);
                     return (
                       <TableRow key={q.id}>
                         <TableCell className="max-w-64 truncate" title={q.prompt}>

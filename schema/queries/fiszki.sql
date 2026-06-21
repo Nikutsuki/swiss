@@ -70,8 +70,8 @@ WHERE id = $1
   AND user_id = $2;
 
 -- name: InsertFiszkiQuestions :copyfrom
-INSERT INTO fiszki_question (study_set_id, position, question_type, prompt, answer, choices, correct_indices)
-VALUES ($1, $2, $3, $4, $5, $6, $7);
+INSERT INTO fiszki_question (study_set_id, position, question_type, prompt, answer, choices, correct_indices, image_path)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 
 -- name: ListFiszkiQuestionsBySet :many
 SELECT *

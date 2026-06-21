@@ -6,13 +6,15 @@ import (
 )
 
 type Handler struct {
-	pool *pgxpool.Pool
-	db   *database.Queries
+	pool       *pgxpool.Pool
+	db         *database.Queries
+	uploadsDir string
 }
 
-func New(pool *pgxpool.Pool) *Handler {
+func New(pool *pgxpool.Pool, uploadsDir string) *Handler {
 	return &Handler{
-		pool: pool,
-		db:   database.New(pool),
+		pool:       pool,
+		db:         database.New(pool),
+		uploadsDir: uploadsDir,
 	}
 }

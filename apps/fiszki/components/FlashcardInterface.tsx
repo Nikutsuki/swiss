@@ -10,6 +10,7 @@ export interface FlashcardCard {
   prompt: string;
   answer: string;
   progress?: CardProgressResponse;
+  imagePath?: string;
 }
 
 export interface FlashcardResult {
@@ -41,15 +42,17 @@ export default function FlashcardInterface({
   const [sessionKnown, setSessionKnown] = useState(0);
   const [sessionUnknown, setSessionUnknown] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const resultsRef = useRef<FlashcardResult[]>([]);
-  const cardShownAtRef = useRef(Date.now());
+  const cardShownAtRef = useRef(0);
   const pointerRef = useRef<{ x: number; y: number; time: number; dragging: boolean } | null>(null);
 
   const card = cards[index];
   const isLast = index === cards.length - 1;
 
   useEffect(() => {
+    cardShownAtRef.current = Date.now();
     const start = Date.now();
     const timer = setInterval(() => {
       setElapsedSeconds(Math.round((Date.now() - start) / 1000));
@@ -102,6 +105,7 @@ export default function FlashcardInterface({
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     pointerRef.current = { x: e.clientX, y: e.clientY, time: Date.now(), dragging: true };
+    setIsDragging(true);
   }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
@@ -118,6 +122,7 @@ export default function FlashcardInterface({
     (e: React.PointerEvent) => {
       const start = pointerRef.current;
       pointerRef.current = null;
+      setIsDragging(false);
       if (!start) return;
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
@@ -206,14 +211,17 @@ export default function FlashcardInterface({
             opacity: cardOpacity,
             transition: exiting
               ? `transform ${EXIT_ANIMATION_MS}ms ease-in, opacity ${EXIT_ANIMATION_MS}ms ease-in`
-              : pointerRef.current?.dragging
+              : isDragging
                 ? "none"
                 : "transform 200ms ease-out, opacity 200ms ease-out",
           }}
         >
           <div className={`fiszki-card-inner relative h-72 w-full sm:h-80 ${flipped ? "flipped" : ""}`}>
-            <div className="fiszki-card-face absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-md bg-(--surface-container-low) p-8 text-center">
+            <div className="fiszki-card-face absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-md bg-(--surface-container-low) p-8 text-center">
               <span className="text-xs uppercase tracking-widest text-(--on-surface-variant)">Question</span>
+              {card.imagePath && (
+                <img src={card.imagePath} alt="Question context" className="max-h-24 w-auto object-contain rounded-md mb-2" />
+              )}
               <span className="text-xl font-bold leading-snug sm:text-2xl">{card.prompt}</span>
               <span className="text-xs text-(--on-surface-variant)">
                 Tap to reveal · swipe left if you know it, right if you don&apos;t

@@ -3,7 +3,7 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
     ...init,
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(init?.headers ?? {}),
     },
   });

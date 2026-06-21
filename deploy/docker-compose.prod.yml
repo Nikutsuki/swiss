@@ -88,6 +88,9 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       FISZKI_HTTP_ADDR: :8085
+      UPLOADS_DIR: /uploads
+    volumes:
+      - fiszki-uploads:/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -299,6 +302,7 @@ services:
 
 volumes:
   pgdata:
+  fiszki-uploads:
 
 networks:
   swiss-internal:

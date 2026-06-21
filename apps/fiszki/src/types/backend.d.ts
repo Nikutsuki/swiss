@@ -12,6 +12,7 @@ export interface QuestionInput {
   answer?: string;
   choices?: string[];
   correct_indices?: number /* int */[];
+  image_path?: string;
 }
 /**
  * CreateStudySetRequest is the JSON body for POST /sets.
@@ -55,6 +56,7 @@ export interface QuestionResponse {
   answer?: string;
   choices?: string[];
   correct_indices?: number /* int */[];
+  image_path?: string;
 }
 /**
  * CardProgressResponse is per-card spaced-repetition state inside GET /sets/{id}.

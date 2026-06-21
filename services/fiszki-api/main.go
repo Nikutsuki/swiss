@@ -34,8 +34,19 @@ func main() {
 		addr = ":8085"
 	}
 
-	h := handlers.New(pool)
+	uploadsDir := os.Getenv("UPLOADS_DIR")
+	if uploadsDir == "" {
+		uploadsDir = "./uploads"
+	}
+
+	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+		log.Fatalf("Failed to create uploads directory: %v", err)
+	}
+
+	h := handlers.New(pool, uploadsDir)
 	mux := http.NewServeMux()
+	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir))))
+
 	mux.HandleFunc("POST /sets", h.CreateStudySet)
 	mux.HandleFunc("GET /sets", h.ListStudySets)
 	mux.HandleFunc("GET /sets/{id}", h.GetStudySet)

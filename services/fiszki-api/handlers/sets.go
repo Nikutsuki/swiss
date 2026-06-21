@@ -3,11 +3,18 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/Nikutsuki/swiss/services/fiszki-api/models"
 	"github.com/Nikutsuki/swiss/services/internal/database"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -58,6 +65,25 @@ func validateQuestion(q models.QuestionInput) string {
 	return ""
 }
 
+func getQuestionNumberFromFilename(filename string) (int, bool) {
+	var digits []rune
+	for _, r := range filename {
+		if r >= '0' && r <= '9' {
+			digits = append(digits, r)
+		} else {
+			break
+		}
+	}
+	if len(digits) == 0 {
+		return 0, false
+	}
+	val, err := strconv.Atoi(string(digits))
+	if err != nil {
+		return 0, false
+	}
+	return val, true
+}
+
 func (h *Handler) CreateStudySet(w http.ResponseWriter, r *http.Request) {
 	userID, ok := mustClaimsUserID(r)
 	if !ok {
@@ -65,19 +91,42 @@ func (h *Handler) CreateStudySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
-	var body models.CreateStudySetRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			http.Error(w, "Study set is too large (max 2 MiB)", http.StatusRequestEntityTooLarge)
+	var name string
+	var description string
+	var questions []models.QuestionInput
+	var multipartFiles []*multipart.FileHeader
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
 			return
 		}
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
+		name = strings.TrimSpace(r.FormValue("name"))
+		description = strings.TrimSpace(r.FormValue("description"))
+		questionsJSON := r.FormValue("questions")
+		if err := json.Unmarshal([]byte(questionsJSON), &questions); err != nil {
+			http.Error(w, "Invalid questions JSON", http.StatusBadRequest)
+			return
+		}
+		multipartFiles = r.MultipartForm.File["images"]
+	} else {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+		var body models.CreateStudySetRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				http.Error(w, "Study set is too large (max 2 MiB)", http.StatusRequestEntityTooLarge)
+				return
+			}
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		name = strings.TrimSpace(body.Name)
+		description = strings.TrimSpace(body.Description)
+		questions = body.Questions
 	}
 
-	name := strings.TrimSpace(body.Name)
 	if name == "" {
 		http.Error(w, "Study set name is required", http.StatusBadRequest)
 		return
@@ -86,19 +135,28 @@ func (h *Handler) CreateStudySet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Study set name is too long", http.StatusBadRequest)
 		return
 	}
-	if len(body.Questions) == 0 {
+	if len(questions) == 0 {
 		http.Error(w, "Study set must contain at least one question", http.StatusBadRequest)
 		return
 	}
-	if len(body.Questions) > maxQuestionsPerSet {
+	if len(questions) > maxQuestionsPerSet {
 		http.Error(w, "Study set has too many questions", http.StatusBadRequest)
 		return
 	}
-	for _, q := range body.Questions {
+	for _, q := range questions {
 		if msg := validateQuestion(q); msg != "" {
 			http.Error(w, msg, http.StatusBadRequest)
 			return
 		}
+	}
+
+	fileMap := make(map[int]*multipart.FileHeader)
+	for _, fh := range multipartFiles {
+		num, ok := getQuestionNumberFromFilename(fh.Filename)
+		if !ok {
+			continue
+		}
+		fileMap[num] = fh
 	}
 
 	ctx := r.Context()
@@ -123,15 +181,22 @@ func (h *Handler) CreateStudySet(w http.ResponseWriter, r *http.Request) {
 	setID, err := qtx.CreateFiszkiStudySet(ctx, database.CreateFiszkiStudySetParams{
 		UserID:      userID,
 		Name:        name,
-		Description: strings.TrimSpace(body.Description),
+		Description: description,
 	})
 	if err != nil {
 		http.Error(w, "Failed to create study set", http.StatusInternalServerError)
 		return
 	}
 
-	rows := make([]database.InsertFiszkiQuestionsParams, 0, len(body.Questions))
-	for i, q := range body.Questions {
+	var writtenFiles []string
+	rollbackFiles := func() {
+		for _, f := range writtenFiles {
+			_ = os.Remove(f)
+		}
+	}
+
+	rows := make([]database.InsertFiszkiQuestionsParams, 0, len(questions))
+	for i, q := range questions {
 		row := database.InsertFiszkiQuestionsParams{
 			StudySetID:   setID,
 			Position:     int32(i),
@@ -144,14 +209,58 @@ func (h *Handler) CreateStudySet(w http.ResponseWriter, r *http.Request) {
 			row.Choices = q.Choices
 			row.CorrectIndices = int32sFromInts(q.CorrectIndices)
 		}
+
+		if fh, found := fileMap[i+1]; found {
+			ext := strings.ToLower(filepath.Ext(fh.Filename))
+			if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".gif" && ext != ".webp" {
+				rollbackFiles()
+				http.Error(w, "Invalid image format: must be png, jpg, jpeg, gif, or webp", http.StatusBadRequest)
+				return
+			}
+
+			uuidStr := uuid.UUID(setID.Bytes).String()
+			filename := fmt.Sprintf("%s_%d%s", uuidStr, i, ext)
+			filePath := filepath.Join(h.uploadsDir, filename)
+
+			src, err := fh.Open()
+			if err != nil {
+				rollbackFiles()
+				http.Error(w, "Failed to read uploaded image", http.StatusInternalServerError)
+				return
+			}
+			defer src.Close()
+
+			dst, err := os.Create(filePath)
+			if err != nil {
+				rollbackFiles()
+				http.Error(w, "Failed to save image to disk", http.StatusInternalServerError)
+				return
+			}
+			defer dst.Close()
+
+			if _, err := io.Copy(dst, src); err != nil {
+				rollbackFiles()
+				http.Error(w, "Failed to save image contents", http.StatusInternalServerError)
+				return
+			}
+
+			writtenFiles = append(writtenFiles, filePath)
+			row.ImagePath = pgtype.Text{String: "/api/fiszki/uploads/" + filename, Valid: true}
+		} else if q.ImagePath != "" {
+			row.ImagePath = pgtype.Text{String: q.ImagePath, Valid: true}
+		}
+
 		rows = append(rows, row)
 	}
+
 	if _, err := qtx.InsertFiszkiQuestions(ctx, rows); err != nil {
+		rollbackFiles()
 		http.Error(w, "Failed to save questions", http.StatusInternalServerError)
 		return
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		rollbackFiles()
 		http.Error(w, "Failed to create study set", http.StatusInternalServerError)
 		return
 	}
@@ -246,6 +355,7 @@ func (h *Handler) GetStudySet(w http.ResponseWriter, r *http.Request) {
 			Answer:         q.Answer.String,
 			Choices:        q.Choices,
 			CorrectIndices: intsFromInt32s(q.CorrectIndices),
+			ImagePath:      q.ImagePath.String,
 		})
 	}
 	for _, p := range progress {
@@ -287,6 +397,16 @@ func (h *Handler) DeleteStudySet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Study set not found", http.StatusNotFound)
 		return
 	}
+
+	uuidStr := uuid.UUID(setID.Bytes).String()
+	pattern := filepath.Join(h.uploadsDir, uuidStr+"_*")
+	matches, err := filepath.Glob(pattern)
+	if err == nil {
+		for _, m := range matches {
+			_ = os.Remove(m)
+		}
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

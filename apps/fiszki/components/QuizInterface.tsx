@@ -13,6 +13,7 @@ export interface QuizQuestion {
    *  (identity when answers are not shuffled). The server grades and the
    *  report renders in original coordinates. */
   originalIndices: number[];
+  imagePath?: string;
 }
 
 const CHOICE_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -30,7 +31,11 @@ export default function QuizInterface({
   const [selected, setSelected] = useState<number[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const answersRef = useRef<SessionAnswerInput[]>([]);
-  const questionShownAtRef = useRef(Date.now());
+  const questionShownAtRef = useRef(0);
+
+  useEffect(() => {
+    questionShownAtRef.current = Date.now();
+  }, []);
 
   const question = questions[index];
   const isMultiSelect = question.correctIndices.length > 1;
@@ -135,6 +140,9 @@ export default function QuizInterface({
 
       <Card className="mt-6">
         <h2 className="text-xl font-bold leading-snug sm:text-2xl">{question.prompt}</h2>
+        {question.imagePath && (
+          <img src={question.imagePath} alt="Question context" className="max-h-48 w-auto object-contain rounded-md mt-4 mx-auto" />
+        )}
         {isMultiSelect && !submitted ? (
           <p className="mt-2 text-xs uppercase tracking-widest text-(--on-surface-variant)">
             Select all correct answers
