@@ -34,7 +34,7 @@ func (h *Handler) setSSOCookie(w http.ResponseWriter, token string) {
 		Name:     authn.SSOCookieName,
 		Value:    token,
 		Path:     "/",
-		MaxAge:   3600,
+		MaxAge:   3600*3,
 		HttpOnly: true,
 		Secure:   cookieSecure(),
 		SameSite: cookieSameSite(),
