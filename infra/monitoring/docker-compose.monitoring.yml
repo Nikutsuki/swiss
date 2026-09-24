@@ -1,0 +1,82 @@
+name: swiss-monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: swiss-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - monitoring-network
+      - swiss-internal
+    depends_on:
+      - node-exporter
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: swiss-node-exporter
+    restart: unless-stopped
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - monitoring-network
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: swiss-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-swiss}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-utils_db}?sslmode=disable"
+    networks:
+      - monitoring-network
+      - swiss-internal
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: swiss-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/json/swiss-overview.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - monitoring-network
+      - edge-proxy-network
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+    name: swiss-prometheus-data
+  grafana-data:
+    name: swiss-grafana-data
+
+networks:
+  monitoring-network:
+    external: true
+  swiss-internal:
+    external: true
+  edge-proxy-network:
+    external: true

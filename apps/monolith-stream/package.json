@@ -1,0 +1,40 @@
+{
+  "name": "monolith-stream",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack -p 3003 -H 0.0.0.0 --experimental-https --experimental-https-key ../../certs/auth.swiss.local-key.pem --experimental-https-cert ../../certs/auth.swiss.local.pem",
+    "dev:http": "next dev --webpack -p 3003 -H 0.0.0.0",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@swiss/webrtc-pipeline": "workspace:*",
+    "@swiss/ui": "workspace:*",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.7.0",
+    "next": "16.2.1",
+    "qrcode.react": "^4.2.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-icons": "^5.6.0",
+    "react-rnd": "^10.5.3",
+    "tailwind-merge": "^3.5.0",
+    "uuid": "^13.0.0",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/uuid": "^11.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.1",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3.0.9"
+  }
+}

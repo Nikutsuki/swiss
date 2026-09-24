@@ -1,0 +1,21 @@
+{
+  "name": "swiss",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Swiss monorepo for auth, encrypted sharing, file drop, and streaming apps.",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:go": "node scripts/test-go.mjs",
+    "check": "pnpm lint && pnpm test && pnpm test:go && pnpm build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.32.1",
+  "devDependencies": {
+    "turbo": "^2.8.20"
+  }
+}

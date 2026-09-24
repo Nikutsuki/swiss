@@ -1,0 +1,75 @@
+:root {
+  --surface: #131313;
+  --surface-container-lowest: #0e0e0e;
+  --surface-container-low: #1c1b1b;
+  --surface-container-high: #2a2a2a;
+  --surface-bright: #3a3a3a;
+  --on-surface: #f5f5f5;
+  --on-surface-variant: #c6c6c6;
+  --outline-variant: #474747;
+  --security-emerald: #5ddda1;
+  --primary-fixed: #006c46;
+  --on-primary: #002112;
+
+  --vault-bg-start: #151515;
+  --vault-bg-end: #101010;
+  --vault-glass: rgb(42 42 42 / 60%);
+}
+body {
+  min-height: 100vh;
+  font-family: var(--font-inter, "Inter", sans-serif);
+  background-color: var(--surface);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-space-grotesk, "Space Grotesk", sans-serif);
+}
+
+::selection {
+  background-color: var(--security-emerald);
+  color: #000;
+}
+
+::-moz-selection {
+  background-color: var(--security-emerald);
+  color: #000;
+}
+
+@media (width >= 64rem) {
+  .editorial-grid {
+    grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+    gap: 3.5rem;
+    align-items: start;
+  }
+}
+
+
+.editorial-rail {
+  color: var(--on-surface-variant);
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  line-height: 1.6;
+}
+
+.vault-burn-progress {
+  height: 2px;
+  width: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--security-emerald), rgb(93 221 161 / 25%));
+}
+
+.vault-glass {
+  background: var(--vault-glass);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 40px rgb(0 0 0 / 40%);
+}
+
+.auth-background {
+    background: linear-gradient(180deg, var(--vault-bg-start) 0%, var(--vault-bg-end) 100%);
+}

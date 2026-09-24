@@ -1,0 +1,6 @@
+packages:
+  - path: "github.com/Nikutsuki/swiss/services/monolith-stream-api/models"
+    output_path: "../../apps/monolith-stream/src/types/backend.d.ts"
+    type_mappings:
+      "time.Time": "string"
+      "uuid.UUID": "string"

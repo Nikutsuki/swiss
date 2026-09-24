@@ -1,0 +1,22 @@
+@import "tailwindcss";
+@source "../../../packages/ui";
+@import "@swiss/ui/styles.css";
+
+@keyframes webcodecs-buffer-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.webcodecs-buffer-shimmer {
+  animation: webcodecs-buffer-shimmer 1.25s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webcodecs-buffer-shimmer {
+    animation: none;
+  }
+}

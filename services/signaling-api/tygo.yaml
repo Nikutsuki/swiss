@@ -1,0 +1,8 @@
+packages:
+  - path: "github.com/Nikutsuki/swiss/services/signaling-api/models"
+    output_path: "../../packages/webrtc-signaling/src/generated/signaling-backend.d.ts"
+    type_mappings:
+      "time.Time": "string"
+      "uuid.UUID": "string"
+      "json.RawMessage": "unknown"
+      "encoding/json.RawMessage": "unknown"

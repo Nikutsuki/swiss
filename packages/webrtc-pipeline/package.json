@@ -1,0 +1,16 @@
+{
+  "name": "@swiss/webrtc-pipeline",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^3.0.9"
+  }
+}
